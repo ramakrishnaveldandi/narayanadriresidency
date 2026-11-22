@@ -12,7 +12,10 @@ import { DataService } from '../../core/data.service';
         Only the association's administrator Google account can sign in.
       </p>
       @if (auth.configured) {
-        <div #gsiButton class="gsi"></div>
+        <div class="gsi">
+          <div #gsiButton></div>
+          <span>Sign in with Google</span>
+        </div>
       } @else {
         <div class="alert warn small" style="text-align:left">
           Google sign-in is not set up yet. Add the OAuth client ID to <code>admin.googleClientId</code> in
@@ -24,7 +27,7 @@ import { DataService } from '../../core/data.service';
       }
     </div>
   `,
-  styles: `.gsi { display: flex; justify-content: center; min-height: 44px; }`,
+  styles: `.gsi { display: flex; justify-content: center; align-items: center; gap: 10px; min-height: 44px; font-weight: 600; }`,
 })
 export class AdminLogin implements AfterViewInit {
   protected readonly auth = inject(AdminAuthService);

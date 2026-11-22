@@ -69,7 +69,8 @@ export class AdminAuthService {
       ux_mode: 'popup',
       callback: ({ credential }) => void this.acceptCredential(credential).then(onResult),
     });
-    gsi.renderButton(el, { type: 'standard', theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill' });
+    // Icon-only button: Google does not personalise it, so no account name or email is ever shown.
+    gsi.renderButton(el, { type: 'icon', theme: 'outline', size: 'large', shape: 'circle' });
   }
 
   logout(): void {
