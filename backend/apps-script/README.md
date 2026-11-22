@@ -69,6 +69,13 @@ Deploy**. That keeps the same URL.
 3. As money arrives, use **Admin → Payments** to record payments or verify UTRs from residents, or upload the bank
    statement in **Reconcile**.
 
+## Deleting a month
+
+Admin → History → **Delete** (asks for a reason and for the month to be typed) does the following:
+- moves that month's `<month>.json` and Excel file to the **Google Drive Trash**, where they can be restored for 30 days
+- keeps its payments and audit entries in the sheet; they come back when the month is uploaded again
+- if it was the latest month, moves the previous month's files from `History` back to `Latest`, so residents see the newest remaining month
+
 ## Security notes
 
 - Every admin request carries the Google ID token. The server checks it with Google (`tokeninfo`): it must be issued to

@@ -66,6 +66,8 @@ function doPost(e) {
     switch (body.action) {
       case 'publishMonth':
         return withLock_(function () { return publishMonth_(body.bill, body.correctionReason, actor, body.sourceFile, body.markPaid); });
+      case 'deleteMonth':
+        return withLock_(function () { return deleteMonth_(body.month, body.reason, actor); });
       case 'addPayment':
         return withLock_(function () { return addPayment_(body.payment, actor, true); });
       case 'updatePayment':
@@ -298,6 +300,44 @@ function markPaidFromSheet_(bill, flats, actor) {
   sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
   audit_(actor, 'mark-paid-from-sheet', bill.month, rows.length + ' flats marked Paid from the Status column of the sheet');
   return rows.length;
+}
+
+/**
+ * Deletes a published month so the admin can correct and re-upload it. The month's
+ * data file and Excel go to the Drive Trash (restorable for 30 days); payments and the
+ * audit trail stay in the sheet and reappear when the month is published again. If the
+ * latest month is deleted, the previous month's files move back from History to Latest,
+ * so residents always see the newest remaining month.
+ */
+function deleteMonth_(month, reason, actor) {
+  if (!reason || !String(reason).trim()) throw new Error('A reason is required to delete a month.');
+  var bill = getBill_(month);
+  if (!bill) throw new Error(month + ' is not published.');
+  var wasLatest = latestMonth_() === month;
+  var f = folders_();
+  trashMonthJson_(f, month);
+  var excelId = bill.source && bill.source.driveFileId;
+  if (excelId) {
+    try { DriveApp.getFileById(excelId).setTrashed(true); } catch (e) { /* already gone */ }
+  }
+  deleteRowsWhere_(sheet_('BillLines'), 0, month);
+  clearIndexCache_();
+  var latest = latestMonth_();
+  if (wasLatest && latest) restoreToLatest_(f, latest);
+  audit_(actor, 'delete-month', month, String(reason).slice(0, 300) + (latest ? ' - residents now see ' + latest : ''));
+  return { latest: latest };
+}
+
+/** Moves a month's data file and its Excel from History back to Latest. */
+function restoreToLatest_(f, month) {
+  var bill = getBill_(month);
+  var it = f.history.getFilesByName(month + '.json');
+  while (it.hasNext()) it.next().moveTo(f.latest);
+  var excelId = bill && bill.source && bill.source.driveFileId;
+  if (excelId) {
+    try { DriveApp.getFileById(excelId).moveTo(f.latest); } catch (e) { /* missing */ }
+  }
+  clearIndexCache_();
 }
 
 function storeExcel_(f, target, month, sourceFile, driveFileId) {
