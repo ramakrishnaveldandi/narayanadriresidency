@@ -1,7 +1,7 @@
 /** Month key in ISO form, e.g. "2026-10". */
 export type MonthKey = string;
 
-export type ColumnRole = 'flat' | 'info' | 'expense' | 'total' | 'ignore';
+export type ColumnRole = 'flat' | 'info' | 'expense' | 'total' | 'status' | 'ignore';
 
 export interface BillColumn {
   /** Stable key, unique within a month (headers can repeat, e.g. three "Total" columns). */
@@ -25,6 +25,8 @@ export interface FlatBill {
   total: number;
   /** 1-based row number in the source sheet (for traceability). */
   sourceRow?: number;
+  /** Value of the sheet's "Status" column, e.g. "P" (paid). */
+  sheetStatus?: string;
 }
 
 export interface BillSource {
@@ -47,7 +49,7 @@ export interface MonthBill {
   version: number;
 }
 
-export type PaymentSource = 'admin' | 'resident' | 'reconciliation';
+export type PaymentSource = 'admin' | 'resident' | 'reconciliation' | 'sheet';
 
 export interface Payment {
   id: string;

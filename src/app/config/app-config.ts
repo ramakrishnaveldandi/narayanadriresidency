@@ -9,29 +9,37 @@ import type { ImportTemplate } from '../core/excel-import';
 export type Visibility = 'full' | 'amounts' | 'flats-only';
 
 /**
- * Column mapping for the Narayanadri Residency monthly sheet
- * (FLAT | PREVIOUS | PRESENT | Total | SLAB I | SLB II Ltrs | Per Ltr | Per Ltr |
- *  Slab I | Slab II | FLAT | Total | Manjeera | MNTS | TOTAL).
- * The sheet has three "Total" columns, so the final one is mapped explicitly
- * instead of assuming "last column = total" (SRS section 5).
+ * Column mapping for the Narayanadri monthly maintenance sheet (NR-WaterMeterReadings workbook).
+ * Rules match the normalised header text (lower case, punctuation removed), e.g.
+ *   FLAT NO. | PREVIOUS READING | PRESENT | Total TARE IN LTRS | SLAB I Ltrs ( Up to 15k) |
+ *   SLB II Ltrs( Above 15k) | Per Ltr in NP Slab I | Per Ltr in NP Slab II | Slab I Charges |
+ *   Slab II Charges | FLAT NO. maintaince stataus | Total WATER CHARGES (Rounded) |
+ *   Manjeera Water Bill per Flat | <extra charges…> | MNTS CHARGES | TOTAL | Status
+ * Older sheets (2019-20: SERVICE NO., TARE IN LTRS, one rate, WATER CHARGES) match too.
+ * Columns not listed here that sit between the water charges and TOTAL become extra
+ * charges automatically (Septic Tank Expenses, Repair Manjeera, …); columns right of
+ * TOTAL are ignored. The final total is the column headed exactly "TOTAL".
  */
 export const NARAYANADRI_TEMPLATE: ImportTemplate = {
   name: 'Narayanadri monthly maintenance sheet',
   rules: [
     { match: '^flat', occurrence: 1, role: 'flat', label: 'Flat' },
     { match: '^flat', occurrence: 2, role: 'ignore' },
+    { match: '^service', role: 'info', label: 'Service No.' },
     { match: '^previous', role: 'info', label: 'Previous Meter Reading' },
     { match: '^present', role: 'info', label: 'Present Meter Reading' },
-    { match: '^total$', occurrence: 1, role: 'info', label: 'Water Consumed (Ltrs)' },
-    { match: '^slab i$', occurrence: 1, role: 'info', label: 'Slab I Usage (Ltrs)' },
-    { match: '^sla?b ii ltr', role: 'info', label: 'Slab II Usage (Ltrs)' },
-    { match: '^per ltr', role: 'ignore' },
-    { match: '^slab i$', occurrence: 2, role: 'info', label: 'Slab I Water Charge (₹)' },
-    { match: '^slab ii$', occurrence: 1, role: 'info', label: 'Slab II Water Charge (₹)' },
-    { match: '^total$', occurrence: 2, role: 'expense', label: 'Water Charges' },
+    { match: '^(total )?tare', role: 'info', label: 'Water Consumed (Ltrs)' },
+    { match: '^slab i ltrs', role: 'info', label: 'Slab I Usage (Ltrs, up to 15k)' },
+    { match: '^sla?b ii ltrs', role: 'info', label: 'Slab II Usage (Ltrs, above 15k)' },
+    { match: '^per ltr', occurrence: 1, role: 'info', label: 'Rate - Slab I (₹ per Ltr)' },
+    { match: '^per ltr', occurrence: 2, role: 'info', label: 'Rate - Slab II (₹ per Ltr)' },
+    { match: '^slab i charges', role: 'info', label: 'Slab I Water Charge (₹)' },
+    { match: '^slab ii charges', role: 'info', label: 'Slab II Water Charge (₹)' },
+    { match: '^(total )?water charges', role: 'expense', label: 'Water Charges' },
     { match: '^manjeera', role: 'expense', label: 'Manjeera Water' },
     { match: '^(mnts|maint)', role: 'expense', label: 'Maintenance' },
-    { match: '^total$', occurrence: 3, role: 'total', label: 'Total Due' },
+    { match: '^total$', occurrence: 1, role: 'total', label: 'Total Due' },
+    { match: '^status$', occurrence: 1, role: 'status', label: 'Status' },
   ],
 };
 

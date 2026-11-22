@@ -134,7 +134,11 @@ export class FlatDetail {
   }
 
   protected readonly bill = computed(() => this.record.value()?.bill.flats.find((f) => f.flat === this.flat()) ?? null);
-  protected readonly expenseColumns = computed(() => this.record.value()?.bill.columns.filter((c) => c.role === 'expense') ?? []);
+  /** Line items that apply to this flat (extra charges left blank for it are not shown). */
+  protected readonly expenseColumns = computed(() => {
+    const values = this.bill()?.values ?? {};
+    return (this.record.value()?.bill.columns ?? []).filter((c) => c.role === 'expense' && values[c.key] !== null && values[c.key] !== undefined && values[c.key] !== '');
+  });
   protected readonly infoColumns = computed(() => this.record.value()?.bill.columns.filter((c) => c.role === 'info') ?? []);
   protected readonly summary = computed(() => {
     const r = this.record.value();
