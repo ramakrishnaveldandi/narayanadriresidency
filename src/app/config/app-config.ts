@@ -67,7 +67,7 @@ export const APP_CONFIG = {
    * Empty = "static mode": data is read from /public/data/*.json and admin
    * changes are kept in the browser until exported and committed.
    */
-  apiUrl: '',
+  apiUrl: 'https://script.google.com/macros/s/AKfycbwUZFKv7ydb9QtaHYsOoIKwlNwrf65tXWvcGBz-nlEBnQsmSax1Zd8EsBPwWM0wroRwWg/exec',
 
   /** Folder under /public holding static month files. */
   dataPath: 'data',
