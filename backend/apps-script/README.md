@@ -1,6 +1,6 @@
 # Apps Script backend (Google Sheet + Google Drive)
 
-Everything runs in the association's Google account, **nrassociation123@gmail.com**, and is free.
+Everything runs in the association's Google account, **the association's admin Google account**, and is free.
 
 ## What it gives you
 
@@ -11,7 +11,7 @@ Everything runs in the association's Google account, **nrassociation123@gmail.co
   **The residents' screens are served from these Drive files.**
 - **Residents see only the latest month.** This is enforced on the server. Residents can also download the original Excel
   sheet from the dashboard.
-- **Admin access checked through Google sign-in.** Only nrassociation123@gmail.com is accepted.
+- **Admin access checked through Google sign-in.** Only the admin Google account is accepted.
 - **Instant updates.** Residents can submit payment references, and admin payments and verifications are saved immediately
   from any device.
 - **Analytics.** The `BillLines` tab holds one row per flat per line item per month, ready for pivot tables or Looker Studio.
@@ -19,7 +19,7 @@ Everything runs in the association's Google account, **nrassociation123@gmail.co
 ## Where things are stored
 
 ```
-Google Drive of nrassociation123@gmail.com
+Google Drive of the admin Google account
 └── My Drive
     ├── NR Maintenance Data          ← Google Sheet (bills, payments, audit, analytics)
     └── NR Maintenance/              ← created automatically by setup()
@@ -34,7 +34,7 @@ Google Drive of nrassociation123@gmail.com
 
 Sheet tabs: `Payments`, `Audit`, `BillLines`.
 
-## Setup (about 15 minutes, signed in as nrassociation123@gmail.com)
+## Setup (about 15 minutes, signed in as the admin Google account)
 
 1. **Create the Google client ID** for "Sign in with Google" (main README → *Admin sign-in*). You need this value in steps 4
    and 7.
@@ -45,16 +45,16 @@ Sheet tabs: `Payments`, `Audit`, `BillLines`.
      [`appsscript.json`](appsscript.json).
 4. Go to **Project Settings → Script properties → Add script property**:
    - `GOOGLE_CLIENT_ID`: the client ID from step 1.
-   - `ADMIN_EMAIL`: `nrassociation123@gmail.com`.
+   - `ADMIN_EMAIL`: `the admin Google account`.
 5. Back in the editor, choose the **`setup`** function in the toolbar and click **Run**. Approve the permissions (Sheets,
    Drive, external requests). If you see "Google hasn't verified this app", click **Advanced → Go to … (unsafe)**. It's your
    own script. `setup` creates the sheet tabs and the `NR Maintenance / Latest / History` folders, and prints their links
    under **Execution log**.
-6. Click **Deploy → New deployment**, select type **Web app**, set *Execute as*: **Me (nrassociation123@gmail.com)** and
+6. Click **Deploy → New deployment**, select type **Web app**, set *Execute as*: **Me (the admin account)** and
    *Who has access*: **Anyone**, then **Deploy**. Copy the **Web app URL**. It ends with `/exec`.
 7. Send that URL and the client ID to the developer, or put them yourself in `src/app/config/app-config.ts`: `apiUrl` and
    `admin.googleClientId`. Commit and push to `main`. GitHub Pages redeploys in a few minutes.
-8. On the website, go to **Admin login → Sign in with Google (nrassociation123@gmail.com) → Import month** and upload
+8. On the website, go to **Admin login → Sign in with Google (admin account) → Import month** and upload
    `samples/Oct-2026.xlsx` to publish October 2026 into Drive.
 
 After any later change to `Code.gs`, use **Deploy → Manage deployments → Edit (pencil) → Version: New version →

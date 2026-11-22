@@ -10,7 +10,7 @@ function jwt(payload: object): string {
 
 describe('decodeJwt', () => {
   it('reads the Google ID token payload', () => {
-    expect(decodeJwt(jwt({ email: 'nrassociation123@gmail.com', aud: 'abc', exp: 1 }))).toMatchObject({ email: 'nrassociation123@gmail.com', aud: 'abc' });
+    expect(decodeJwt(jwt({ email: 'admin@example.com', aud: 'abc', exp: 1 }))).toMatchObject({ email: 'admin@example.com', aud: 'abc' });
     expect(decodeJwt('garbage')).toBeNull();
   });
 });

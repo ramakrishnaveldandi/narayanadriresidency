@@ -18,7 +18,7 @@
  *
  * Script properties (Project Settings -> Script properties):
  *   GOOGLE_CLIENT_ID - OAuth web client ID used by the app's "Sign in with Google" (required)
- *   ADMIN_EMAIL      - the only admin account (default nrassociation123@gmail.com)
+ *   ADMIN_EMAIL      - the only admin Google account (required; kept here, never in the code)
  *   ROOT_FOLDER_ID, LATEST_FOLDER_ID, HISTORY_FOLDER_ID - filled in automatically by setup()
  *
  * Access rules:
@@ -61,7 +61,7 @@ function doPost(e) {
     if (body.action === 'sourceFile') return readSourceFile_(body.month, !!admin);
 
     // Everything below is admin-only.
-    if (!admin) throw new Error('Administrator sign-in required (only ' + adminEmail_() + ').');
+    if (!admin) throw new Error('Administrator sign-in required.');
     var actor = admin.email;
     switch (body.action) {
       case 'publishMonth':
@@ -105,7 +105,26 @@ function withLock_(fn) {
 // ------------------------------------------------------------------ auth
 
 function adminEmail_() {
-  return (PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL') || 'nrassociation123@gmail.com').toLowerCase();
+  var email = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+  if (!email) throw new Error('Server is not configured (ADMIN_EMAIL).');
+  return String(email).trim().toLowerCase();
+}
+
+/**
+ * Cheap local checks on an ID token before asking Google: shape, audience, expiry and
+ * email. Random or foreign tokens are rejected here without using the daily
+ * UrlFetch quota, so flooding the endpoint with fake tokens cannot exhaust it.
+ */
+function precheckToken_(idToken, clientId) {
+  var parts = String(idToken).split('.');
+  if (parts.length !== 3 || idToken.length > 4096) return false;
+  var admin = adminEmail_(); // throws a clear error if the server is not configured
+  try {
+    var payload = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString());
+    return payload.aud === clientId && Number(payload.exp) * 1000 > Date.now() && String(payload.email || '').toLowerCase() === admin;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -121,6 +140,7 @@ function verifyAdmin_(idToken) {
   var key = 'tok_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, idToken));
   var cached = cache.get(key);
   if (cached) return cached === 'no' ? null : { email: cached };
+  if (!precheckToken_(idToken, clientId)) return null; // no network call for bogus tokens
 
   var res = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), { muteHttpExceptions: true });
   var ok = null;
