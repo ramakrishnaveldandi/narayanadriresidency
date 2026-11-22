@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { APP_CONFIG } from '../../config/app-config';
-import { DataService, DriveFile } from '../../core/data.service';
+import { DataService, DriveFile, UploadedFile } from '../../core/data.service';
 import { detectMonth, extractFlats, parseSheet, sumExpenses, toNumber, validateBill, type Row } from '../../core/excel-import';
 import type { BillColumn, BillSource, ColumnRole, FlatBill, MonthBill } from '../../core/models';
 import { readWorkbook, type RawSheet } from '../../core/spreadsheet';
@@ -29,6 +29,7 @@ const ROLES: { value: ColumnRole; label: string }[] = [
         </label>
         @if (data.mode === 'api') {
           <button class="btn" type="button" (click)="loadDrive()" [disabled]="busy()">Browse Google Drive folder</button>
+          <span class="small muted">On publish the file is saved to Drive: NR Maintenance / Latest (previous month → History).</span>
         } @else {
           <span class="small muted">Google Drive import is available once the Apps Script backend is connected.</span>
         }
@@ -216,6 +217,8 @@ export class AdminImport {
   protected readonly sheetIndex = signal(0);
   protected readonly headerRow = signal(-1);
   protected readonly imageUrl = signal<string | null>(null);
+  /** The uploaded file itself - stored in Drive (Latest/) when the month is published. */
+  private upload: UploadedFile | null = null;
 
   protected readonly month = signal('');
   protected readonly title = signal('');
@@ -267,6 +270,8 @@ export class AdminImport {
 
   private async load(name: string, mime: string, data: ArrayBuffer, kind: 'excel' | 'drive', driveFileId?: string): Promise<void> {
     this.reset();
+    // Drive files are moved inside Drive by the backend; only fresh uploads need sending.
+    this.upload = kind === 'drive' ? null : { name, mimeType: mime || guessMime(name), data };
     await this.loadKnownFlats();
     if (mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(name)) {
       this.imageUrl.set(URL.createObjectURL(new Blob([data], { type: mime || 'image/jpeg' })));
@@ -384,9 +389,12 @@ export class AdminImport {
       version: 1,
     };
     await this.run(async () => {
-      await this.data.publishMonth(bill, this.alreadyPublished() ? this.correctionReason : undefined);
+      await this.data.publishMonth(bill, this.alreadyPublished() ? this.correctionReason : undefined, this.upload ?? undefined);
       this.published.set(bill.month);
-      const extra = this.data.mode === 'static' ? ' Export the data files from Reports & backup to make it visible to residents.' : '';
+      const extra =
+        this.data.mode === 'static'
+          ? ' Export the data files from Reports & backup to make it visible to residents.'
+          : ' The source file is saved in Google Drive (NR Maintenance / Latest) and the previous month moved to History.';
       this.message.set(`Published ${bill.month} with ${bill.flats.length} flats.${extra}`);
     });
   }
@@ -406,6 +414,7 @@ export class AdminImport {
     this.published.set(null);
     this.correctionReason = '';
     this.reviewed = false;
+    this.upload = null;
   }
 
   // ------------------------------------------------------------- helpers
@@ -449,4 +458,13 @@ export class AdminImport {
       this.busy.set(false);
     }
   }
+}
+
+function guessMime(name: string): string {
+  const ext = name.toLowerCase().split('.').pop() ?? '';
+  const map: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel', csv: 'text/csv',
+  };
+  return map[ext] ?? 'application/octet-stream';
 }

@@ -67,7 +67,7 @@ export class AdminReports {
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   protected readonly files = signal<string[]>([]);
-  protected readonly selected = computed(() => this.month() || this.data.latestMonth());
+  protected readonly selected = computed(() => this.data.resolveMonth(this.month()));
 
   constructor() {
     void this.data.loadIndex();

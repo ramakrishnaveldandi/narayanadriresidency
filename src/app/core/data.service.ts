@@ -4,6 +4,19 @@ import { compareMonthsDesc, findDuplicateRef, newId } from './billing';
 import type { AuditEntry, MonthBill, MonthIndexEntry, MonthKey, MonthRecord, Payment } from './models';
 import { AdminAuthService } from './admin-auth.service';
 
+/** A file the admin uploaded, sent to the backend to be stored in Drive (Latest/ or History/). */
+export interface UploadedFile {
+  name: string;
+  mimeType: string;
+  data: ArrayBuffer;
+}
+
+export interface SourceFile {
+  name: string;
+  mimeType: string;
+  base64: string;
+}
+
 export interface DriveFile {
   id: string;
   name: string;
@@ -22,7 +35,9 @@ const LOCAL_KEY = 'nrpay.local.v1';
  * Single entry point for reading and writing data.
  *
  * - API mode (APP_CONFIG.apiUrl set): Google Apps Script web app backed by
- *   Google Sheets. Admin writes are authorised server-side with ADMIN_KEY.
+ *   Google Sheets. Admin requests carry a Google ID token that the backend
+ *   verifies (email must be the configured admin). Public reads return only the
+ *   latest month.
  * - Static mode: published months are read from /public/data/*.json (committed
  *   to the repo and served by GitHub Pages). Admin changes are kept in this
  *   browser and exported as JSON files to commit.
@@ -34,8 +49,24 @@ export class DataService {
   private indexPromise?: Promise<MonthIndexEntry[]>;
 
   readonly mode: 'api' | 'static' = APP_CONFIG.apiUrl ? 'api' : 'static';
-  readonly index = signal<MonthIndexEntry[]>([]);
-  readonly latestMonth = computed(() => this.index()[0]?.month ?? null);
+  /** Every published month (newest first) that this session was given. */
+  private readonly allIndex = signal<MonthIndexEntry[]>([]);
+  readonly latestMonth = computed(() => this.allIndex()[0]?.month ?? null);
+  /** Months the current user may see: all for the admin, only the latest for residents. */
+  readonly index = computed(() => {
+    const all = this.allIndex();
+    return this.auth.isAdmin() || !APP_CONFIG.residentsSeeLatestMonthOnly ? all : all.slice(0, 1);
+  });
+
+  /** The month to show: the requested one if this user may see it, otherwise the latest. */
+  resolveMonth(requested?: string | null): MonthKey | null {
+    if (requested && this.index().some((m) => m.month === requested)) return requested;
+    return this.latestMonth();
+  }
+
+  private canSee(month: MonthKey): boolean {
+    return this.auth.isAdmin() || !APP_CONFIG.residentsSeeLatestMonthOnly || month === this.latestMonth();
+  }
   /** Static mode: true when this browser holds admin changes not yet exported. */
   readonly hasLocalChanges = signal(this.readLocal() !== null);
 
@@ -45,7 +76,7 @@ export class DataService {
     if (!this.indexPromise || force) {
       this.indexPromise = this.fetchIndex().then((list) => {
         const sorted = [...list].sort((a, b) => compareMonthsDesc(a.month, b.month));
-        this.index.set(sorted);
+        this.allIndex.set(sorted);
         return sorted;
       });
     }
@@ -53,10 +84,12 @@ export class DataService {
   }
 
   async getMonth(month: MonthKey, force = false): Promise<MonthRecord | null> {
+    await this.loadIndex();
+    if (!this.canSee(month)) return null;
     if (!force && this.cache.has(month)) return this.cache.get(month)!;
     let record: MonthRecord | null;
     if (this.mode === 'api') {
-      record = await this.apiGet<MonthRecord | null>({ action: 'month', month });
+      record = await this.apiRead<MonthRecord | null>({ action: 'month', month });
     } else {
       record = this.readLocal()?.months[month] ?? (await this.fetchJson<MonthRecord>(`${APP_CONFIG.dataPath}/${month}.json`));
     }
@@ -69,21 +102,22 @@ export class DataService {
   }
 
   async getAllMonths(): Promise<MonthRecord[]> {
-    const index = await this.loadIndex();
-    const records = await Promise.all(index.map((m) => this.getMonth(m.month)));
+    await this.loadIndex();
+    const records = await Promise.all(this.index().map((m) => this.getMonth(m.month)));
     return records.filter((r): r is MonthRecord => !!r);
   }
 
   // ------------------------------------------------------------- admin writes
 
-  async publishMonth(bill: MonthBill, correctionReason?: string): Promise<void> {
+  async publishMonth(bill: MonthBill, correctionReason?: string, upload?: UploadedFile): Promise<void> {
     this.auth.requireAdmin();
     const existing = (await this.loadIndex()).some((m) => m.month === bill.month);
     if (existing && !correctionReason?.trim()) {
       throw new Error(`${bill.month} is already published. Enter a correction reason to replace it.`);
     }
     if (this.mode === 'api') {
-      await this.apiPost({ action: 'publishMonth', bill, correctionReason });
+      const sourceFile = upload ? { name: upload.name, mimeType: upload.mimeType, base64: toBase64(upload.data) } : undefined;
+      await this.apiPost({ action: 'publishMonth', bill, correctionReason, sourceFile });
     } else {
       const store = this.ensureLocal();
       const prev = store.months[bill.month] ?? (await this.getMonth(bill.month));
@@ -162,6 +196,12 @@ export class DataService {
 
   // ------------------------------------------------------------ Google Drive
 
+  /** Original sheet (image / Excel) stored in Drive for a month. API mode only. */
+  async getSourceFile(month: MonthKey): Promise<SourceFile | null> {
+    if (this.mode !== 'api' || !this.canSee(month)) return null;
+    return this.apiRead<SourceFile | null>({ action: 'sourceFile', month });
+  }
+
   listDriveFiles(): Promise<DriveFile[]> {
     this.auth.requireAdmin();
     if (this.mode !== 'api') return Promise.reject(new Error('Google Drive import needs the Apps Script backend (apiUrl).'));
@@ -208,7 +248,7 @@ export class DataService {
   }
 
   private async fetchIndex(): Promise<MonthIndexEntry[]> {
-    if (this.mode === 'api') return this.apiGet<MonthIndexEntry[]>({ action: 'index' });
+    if (this.mode === 'api') return this.apiRead<MonthIndexEntry[]>({ action: 'index' });
     const local = this.readLocal()?.index;
     if (local) return local;
     const res = await this.fetchJson<{ months: MonthIndexEntry[] }>(`${APP_CONFIG.dataPath}/index.json`);
@@ -227,12 +267,23 @@ export class DataService {
     return this.unwrap<T>(await fetch(url));
   }
 
+  /** Admin reads go by POST with the ID token (so the server returns all months); others by GET. */
+  private apiRead<T>(params: Record<string, string>): Promise<T> {
+    return this.auth.isAdmin() ? this.apiPost<T>(params) : this.apiGet<T>(params);
+  }
+
+  /** Call after sign-in / sign-out so the visible months refresh. */
+  refreshForSession(): Promise<MonthIndexEntry[]> {
+    this.cache.clear();
+    return this.loadIndex(true);
+  }
+
   private async apiPost<T>(body: Record<string, unknown>): Promise<T> {
     // text/plain avoids a CORS preflight, which Apps Script web apps do not answer.
     const res = await fetch(APP_CONFIG.apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ ...body, key: this.auth.key(), actor: this.auth.actor() }),
+      body: JSON.stringify({ ...body, idToken: this.auth.idToken(), actor: this.auth.actor() }),
     });
     return this.unwrap<T>(res);
   }
@@ -274,4 +325,11 @@ export class DataService {
     }
     this.hasLocalChanges.set(true);
   }
+}
+
+function toBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
 }

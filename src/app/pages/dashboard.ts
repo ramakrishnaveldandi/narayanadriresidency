@@ -6,10 +6,11 @@ import { DataService } from '../core/data.service';
 import type { FlatSummary } from '../core/models';
 import { InrPipe, MonthLabelPipe, StatusClassPipe } from '../shared/format';
 import { MonthSelect, compareFlats, floorOf } from '../shared/month-select';
+import { SourceFileViewer } from '../shared/source-file-viewer';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, InrPipe, MonthLabelPipe, StatusClassPipe, MonthSelect],
+  imports: [RouterLink, InrPipe, MonthLabelPipe, StatusClassPipe, MonthSelect, SourceFileViewer],
   template: `
     <div class="row" style="align-items:flex-end;margin-bottom:16px">
       <div class="spacer">
@@ -39,6 +40,10 @@ import { MonthSelect, compareFlats, floorOf } from '../shared/month-select';
           <span class="badge partially-paid">{{ s.partialCount }} Partially paid</span>
           <span class="badge pending">{{ s.pendingCount }} Pending</span>
         </div>
+      }
+
+      @if (selected(); as m) {
+        <app-source-file-viewer [month]="m" />
       }
 
       <div class="row" style="margin-bottom:12px">
@@ -82,7 +87,7 @@ export class Dashboard {
   protected readonly showStatus = APP_CONFIG.visibility === 'full';
   protected readonly query = signal('');
 
-  protected readonly selected = computed(() => this.month() || this.data.latestMonth());
+  protected readonly selected = computed(() => this.data.resolveMonth(this.month()));
 
   protected readonly record = resource({
     params: () => this.selected() ?? undefined,

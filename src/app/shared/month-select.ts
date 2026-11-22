@@ -8,6 +8,7 @@ import { MonthLabelPipe } from './format';
   selector: 'app-month-select',
   imports: [MonthLabelPipe],
   template: `
+    @if (data.index().length > 1) {
     <label class="field">
       Month
       <select [value]="value() ?? ''" (change)="pick($any($event.target).value)" aria-label="Select month">
@@ -16,6 +17,7 @@ import { MonthLabelPipe } from './format';
         }
       </select>
     </label>
+    }
   `,
 })
 export class MonthSelect {

@@ -30,6 +30,7 @@ export class AdminShell {
 
   logout(): void {
     this.auth.logout();
+    void this.data.refreshForSession();
     void this.router.navigate(['/']);
   }
 }

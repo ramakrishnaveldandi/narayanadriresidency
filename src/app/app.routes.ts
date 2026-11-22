@@ -5,7 +5,7 @@ export const routes: Routes = [
   { path: '', loadComponent: () => import('./pages/dashboard').then((m) => m.Dashboard), title: 'Dashboard' },
   { path: 'flat/:flat', loadComponent: () => import('./pages/flat-detail').then((m) => m.FlatDetail), title: 'Flat details' },
   { path: 'pay/:flat', loadComponent: () => import('./pages/pay').then((m) => m.Pay), title: 'Pay maintenance' },
-  { path: 'history', loadComponent: () => import('./pages/history').then((m) => m.History), title: 'Monthly history' },
+  { path: 'history', canActivate: [adminGuard], loadComponent: () => import('./pages/history').then((m) => m.History), title: 'Monthly history' },
   { path: 'admin/login', loadComponent: () => import('./pages/admin/admin-login').then((m) => m.AdminLogin), title: 'Admin login' },
   {
     path: 'admin',

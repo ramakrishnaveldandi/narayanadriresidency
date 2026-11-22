@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { APP_CONFIG } from '../config/app-config';
 import { summarizeFlat } from '../core/billing';
 import { DataService } from '../core/data.service';
+import { AdminAuthService } from '../core/admin-auth.service';
 import { CellPipe, InrPipe, MonthLabelPipe, StatusClassPipe } from '../shared/format';
 import { MonthSelect } from '../shared/month-select';
 
@@ -108,7 +109,9 @@ import { MonthSelect } from '../shared/month-select';
         } @else {
           <p class="muted">No payments recorded yet.</p>
         }
-        <a class="small" routerLink="/history" [queryParams]="{ flat: flat() }">See all months for flat {{ flat() }} →</a>
+        @if (auth.isAdmin()) {
+          <a class="small" routerLink="/history" [queryParams]="{ flat: flat() }">See all months for flat {{ flat() }} →</a>
+        }
       </div>
     }
   `,
@@ -117,9 +120,10 @@ export class FlatDetail {
   readonly flat = input.required<string>();
   readonly month = input<string>();
   private readonly data = inject(DataService);
+  protected readonly auth = inject(AdminAuthService);
   protected readonly tolerance = APP_CONFIG.paidTolerance;
 
-  protected readonly selected = computed(() => this.month() || this.data.latestMonth());
+  protected readonly selected = computed(() => this.data.resolveMonth(this.month()));
   protected readonly record = resource({
     params: () => this.selected() ?? undefined,
     loader: ({ params }) => this.data.getMonth(params),

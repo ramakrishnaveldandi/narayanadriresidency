@@ -36,7 +36,7 @@ import { MonthSelect } from '../../shared/month-select';
 export class AdminAudit {
   readonly month = input<string>();
   private readonly data = inject(DataService);
-  protected readonly selected = computed(() => this.month() || this.data.latestMonth());
+  protected readonly selected = computed(() => this.data.resolveMonth(this.month()));
   protected readonly record = resource({
     params: () => this.selected() ?? undefined,
     loader: ({ params }) => this.data.getMonth(params, true),
