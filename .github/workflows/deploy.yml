@@ -23,7 +23,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # npm install (not ci): the runner's newer npm is stricter about optional
+      # platform packages in a lock file generated on Windows.
+      - run: npm install --no-audit --no-fund
       - run: npm test -- --watch=false
       - run: npx ng build --base-href "/${{ github.event.repository.name }}/"
       - uses: actions/upload-pages-artifact@v3
