@@ -6,6 +6,7 @@ import { DataService, DriveFile, UploadedFile } from '../../core/data.service';
 import { detectMonth, extractFlats, parseSheet, sumExpenses, toNumber, validateBill, type Row } from '../../core/excel-import';
 import type { BillColumn, BillSource, ColumnRole, FlatBill, MonthBill } from '../../core/models';
 import { readWorkbook, type RawSheet } from '../../core/spreadsheet';
+import { toSheetRows, type ReadRow } from '../../core/ocr-table';
 import { InrPipe, MonthLabelPipe } from '../../shared/format';
 
 const ROLES: { value: ColumnRole; label: string }[] = [
@@ -60,15 +61,32 @@ const ROLES: { value: ColumnRole; label: string }[] = [
 
     @if (imageUrl()) {
       <section class="card stack">
-        <h2>Image reference</h2>
-        <div class="alert info small">
-          Automatic text recognition (OCR) is not enabled yet. Enter the figures from the image in the grid below -
-          start from the previous month's layout so flats and expense columns are pre-filled. Nothing is published until you review it.
-        </div>
-        <img [src]="imageUrl()" alt="Uploaded maintenance sheet" class="ref-img" />
-        <div class="row">
-          <button class="btn" type="button" (click)="startFromPrevious()" [disabled]="!data.latestMonth()">Start from previous month's layout</button>
-        </div>
+        <h2>Uploaded image</h2>
+        @if (ocrProgress(); as p) {
+          <div class="alert info small">
+            {{ p.message }}
+            <div class="bar"><div [style.width.%]="p.fraction * 100"></div></div>
+          </div>
+        }
+        @if (ocrSummary(); as sum) {
+          <div class="alert small" [class.ok]="sum.check === 0" [class.warn]="sum.check > 0">
+            Read <strong>{{ sum.read }}</strong> flats from the image.
+            <strong>{{ sum.ok }}</strong> confirmed (meter readings × tariff match the TOTAL).
+            @if (sum.check > 0) {
+              <strong>{{ sum.check }}</strong> highlighted below - please check those rows against the image.
+            }
+          </div>
+        }
+        <details [open]="!columns().length">
+          <summary class="small">Show image</summary>
+          <img [src]="imageUrl()" alt="Uploaded maintenance sheet" class="ref-img" style="margin-top:8px" />
+        </details>
+        @if (!ocrProgress()) {
+          <div class="row">
+            <button class="btn sm" type="button" (click)="rerunOcr()" [disabled]="busy()">Read image again</button>
+            <button class="btn sm" type="button" (click)="startFromPrevious()" [disabled]="!data.latestMonth()">Enter manually instead</button>
+          </div>
+        }
       </section>
     }
 
@@ -139,18 +157,31 @@ const ROLES: { value: ColumnRole; label: string }[] = [
                 }
                 <th class="num">Total due</th>
                 <th class="num">Line-item sum</th>
+                @if (ocrStatus().size) {
+                  <th>Image check</th>
+                }
                 <th></th>
               </tr>
             </thead>
             <tbody>
               @for (f of flats(); track $index; let i = $index) {
-                <tr [class.bad]="mismatch(f)">
+                <tr [class.bad]="mismatch(f) || ocrStatus().get(f.flat)?.status === 'missing'" [class.check]="ocrStatus().get(f.flat)?.status === 'check'">
                   <td><input [value]="f.flat" (change)="setFlat(i, $any($event.target).value)" style="min-width:60px" /></td>
                   @for (c of gridColumns(); track c.key) {
                     <td><input class="num" [value]="f.values[c.key] ?? ''" (change)="setValue(i, c.key, $any($event.target).value)" /></td>
                   }
                   <td><input class="num" [value]="isNaN(f.total) ? '' : f.total" (change)="setTotal(i, $any($event.target).value)" /></td>
                   <td class="num small">{{ hasExpenses() ? (sum(f) | inr) : '-' }}</td>
+                  @if (ocrStatus().size) {
+                    <td class="small">
+                      @switch (ocrStatus().get(f.flat)?.status) {
+                        @case ('ok') { <span class="badge paid">✓ Confirmed</span> }
+                        @case ('check') { <span class="badge partially-paid" [title]="ocrStatus().get(f.flat)!.notes.join(' ')">Check</span> <span class="muted">{{ ocrStatus().get(f.flat)!.notes.join(' ') }}</span> }
+                        @case ('missing') { <span class="badge pending">Not read</span> <span class="muted">{{ ocrStatus().get(f.flat)!.notes.join(' ') }}</span> }
+                        @default { <span class="muted">edited</span> }
+                      }
+                    </td>
+                  }
                   <td><button class="btn sm danger" type="button" (click)="removeRow(i)" aria-label="Remove row">✕</button></td>
                 </tr>
               }
@@ -162,7 +193,7 @@ const ROLES: { value: ColumnRole; label: string }[] = [
                   <td></td>
                 }
                 <td class="num">{{ grandTotal() | inr }}</td>
-                <td colspan="2"></td>
+                <td [attr.colspan]="ocrStatus().size ? 3 : 2"></td>
               </tr>
             </tfoot>
           </table>
@@ -199,7 +230,10 @@ const ROLES: { value: ColumnRole; label: string }[] = [
   styles: `
     .ref-img { max-width: 100%; border: 1px solid var(--border); border-radius: 8px; }
     tr.dim td { opacity: 0.55; }
-    tr.bad td { background: var(--warn-soft); }
+    tr.bad td { background: var(--bad-soft); }
+    tr.check td { background: var(--warn-soft); }
+    .bar { height: 6px; background: var(--surface); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+    .bar div { height: 100%; background: var(--primary); transition: width 0.3s; }
   `,
 })
 export class AdminImport {
@@ -217,6 +251,15 @@ export class AdminImport {
   protected readonly sheetIndex = signal(0);
   protected readonly headerRow = signal(-1);
   protected readonly imageUrl = signal<string | null>(null);
+  protected readonly ocrProgress = signal<{ message: string; fraction: number } | null>(null);
+  protected readonly ocrStatus = signal<Map<string, Pick<ReadRow, 'status' | 'notes'>>>(new Map());
+  protected readonly ocrSummary = computed(() => {
+    const st = [...this.ocrStatus().values()];
+    if (!st.length) return null;
+    const ok = st.filter((x) => x.status === 'ok').length;
+    return { read: st.filter((x) => x.status !== 'missing').length, ok, check: st.length - ok };
+  });
+  private imageData: { name: string; mime: string; data: ArrayBuffer } | null = null;
   /** The uploaded file itself - stored in Drive (Latest/) when the month is published. */
   private upload: UploadedFile | null = null;
 
@@ -275,8 +318,10 @@ export class AdminImport {
     await this.loadKnownFlats();
     if (mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(name)) {
       this.imageUrl.set(URL.createObjectURL(new Blob([data], { type: mime || 'image/jpeg' })));
-      this.source.set({ fileName: name, kind: 'image-manual', driveFileId, importedAt: new Date().toISOString() });
+      this.source.set({ fileName: name, kind: 'image-ocr', driveFileId, importedAt: new Date().toISOString() });
       this.month.set(detectMonth(name) ?? '');
+      this.imageData = { name, mime, data };
+      await this.readImage();
       return;
     }
     await this.run(async () => {
@@ -305,7 +350,66 @@ export class AdminImport {
     this.defaultTitle();
   }
 
+  async rerunOcr(): Promise<void> {
+    await this.readImage();
+  }
+
+  /** Reads the uploaded screenshot into the review grid (see core/ocr-table.ts). */
+  private async readImage(): Promise<void> {
+    const img = this.imageData;
+    if (!img) return;
+    this.error.set('');
+    this.busy.set(true);
+    this.ocrProgress.set({ message: 'Starting…', fraction: 0 });
+    try {
+      const prev = await this.previousBill();
+      const { readSheetImage } = await import('../../core/ocr-reader');
+      const res = await readSheetImage(
+        img.data,
+        img.mime,
+        { tariff: APP_CONFIG.waterTariff, fixed: prev.fixed, knownFlats: prev.flats, fileName: img.name },
+        (message, fraction) => this.ocrProgress.set({ message, fraction }),
+      );
+      const title = res.title || `${APP_CONFIG.apartmentName} maintenance`;
+      this.sheets.set([{ name: 'Image', rows: toSheetRows(res.rows, res.tariff, APP_CONFIG.sheetHeader, title) }]);
+      this.selectSheet(0);
+      if (res.month) this.month.set(res.month);
+      this.defaultTitle();
+      this.ocrStatus.set(new Map(res.rows.map((r) => [r.flat, { status: r.status, notes: r.notes }])));
+    } catch (e) {
+      this.error.set(`Could not read the image automatically: ${(e as Error).message} You can use "Enter manually instead".`);
+    } finally {
+      this.ocrProgress.set(null);
+      this.busy.set(false);
+    }
+  }
+
+  /** Previous month's flats (in sheet order) and its fixed charges, to guide the image reader. */
+  private async previousBill(): Promise<{ flats: string[]; fixed: { manjeera: number; maintenance: number } }> {
+    const latest = this.data.latestMonth();
+    const rec = latest ? await this.data.getMonth(latest) : null;
+    const fixed = { ...APP_CONFIG.fixedCharges };
+    if (!rec) return { flats: [], fixed };
+    const flats = [...rec.bill.flats].sort((a, b) => (a.sourceRow ?? 0) - (b.sourceRow ?? 0)).map((f) => f.flat);
+    const mode = (re: RegExp): number | undefined => {
+      const col = rec.bill.columns.find((c) => re.test(c.sourceHeader.toLowerCase()));
+      if (!col) return undefined;
+      const counts = new Map<number, number>();
+      for (const f of rec.bill.flats) {
+        const v = f.values[col.key];
+        if (typeof v === 'number') counts.set(v, (counts.get(v) ?? 0) + 1);
+      }
+      return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    };
+    fixed.manjeera = mode(/^manjeera/) ?? fixed.manjeera;
+    fixed.maintenance = mode(/^(mnts|maint)/) ?? fixed.maintenance;
+    return { flats, fixed };
+  }
+
   startFromPrevious(): void {
+    this.ocrStatus.set(new Map());
+    const src = this.source();
+    if (src) this.source.set({ ...src, kind: 'image-manual' });
     void this.run(async () => {
       const prev = await this.data.getMonth(this.data.latestMonth()!);
       if (!prev) return;
@@ -334,16 +438,27 @@ export class AdminImport {
     this.columns.update((cols) => cols.map((c, j) => (j === i ? { ...c, label } : c)));
   }
 
+  private markEdited(i: number): void {
+    const flat = this.flats()[i]?.flat;
+    if (!flat || !this.ocrStatus().has(flat)) return;
+    const m = new Map(this.ocrStatus());
+    m.delete(flat);
+    this.ocrStatus.set(m);
+  }
+
   setFlat(i: number, flat: string): void {
+    this.markEdited(i);
     this.patchRow(i, (f) => ({ ...f, flat: flat.trim() }));
   }
 
   setValue(i: number, key: string, raw: string): void {
+    this.markEdited(i);
     const n = toNumber(raw);
     this.patchRow(i, (f) => ({ ...f, values: { ...f.values, [key]: raw.trim() === '' ? null : (n ?? raw.trim()) } }));
   }
 
   setTotal(i: number, raw: string): void {
+    this.markEdited(i);
     this.patchRow(i, (f) => ({ ...f, total: toNumber(raw) ?? NaN }));
   }
 
@@ -415,6 +530,9 @@ export class AdminImport {
     this.correctionReason = '';
     this.reviewed = false;
     this.upload = null;
+    this.imageData = null;
+    this.ocrStatus.set(new Map());
+    this.ocrProgress.set(null);
   }
 
   // ------------------------------------------------------------- helpers
