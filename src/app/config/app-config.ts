@@ -74,7 +74,7 @@ export const APP_CONFIG = {
      * OAuth 2.0 Web client ID from Google Cloud Console (see README "Admin sign-in").
      * Client IDs are public identifiers - safe to commit. Empty = sign-in disabled.
      */
-    googleClientId: '',
+    googleClientId: '676920536127-mns7efgbh83rg768ro6ebom4uiufukoa.apps.googleusercontent.com',
   },
 
   /** Residents see only the most recent published month; the admin sees every month. */
