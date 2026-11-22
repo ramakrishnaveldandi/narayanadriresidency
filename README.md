@@ -13,7 +13,7 @@ GitHub Pages.
 | Flat details | Bill breakdown (water, Manjeera, maintenance), meter-reading details, total due, verified payments, balance, link back to the source row | FR-04 |
 | Pay | UPI deep link (`upi://pay`) with payee, amount and note pre-filled. QR code generated for that amount. Copy the UPI ID. Association's printed QR as a fallback. Partial amounts allowed | FR-05 |
 | Payment proof | Resident enters the UTR. It goes to the backend (API mode) or into a pre-filled WhatsApp message (static mode). Stays "awaiting verification" until an admin checks it | FR-05/06, §9 |
-| History | Every published month, for one flat or the whole apartment | FR-07 |
+| History | Every published month, for one flat or the whole apartment. **Admin only** | FR-07 |
 | Admin import | Upload Excel/CSV (or pick from Google Drive). Header and month are detected automatically. Column roles are mapped with a template, the grid can be edited, the data is validated, then published. Re-publishing needs a correction reason and is logged | FR-01, FR-08, §5 |
 | Image months | Upload the sheet photo and enter the figures beside it, starting from the previous month's flats and fixed charges. OCR is not enabled yet | FR-02 (partial) |
 | Payments | Record verified payments (full or partial, several per month). Verify or reject resident submissions. Void with a reason. Duplicate UTRs are blocked | FR-06 |
@@ -60,12 +60,33 @@ npm test -- --watch=false
 npm run seed         # rebuilds samples/Oct-2026.xlsx and public/data/2026-10.json
 ```
 
-Admin login in static mode: passphrase `narayanadri-admin`. **Change it before you go live.** Put the SHA-256 of the new
-passphrase in `staticAdminPassphraseSha256`:
+## Who sees what
 
-```bash
-node -e "console.log(require('crypto').createHash('sha256').update('YOUR-PASSPHRASE').digest('hex'))"
-```
+| User | Sees |
+| --- | --- |
+| Residents (no login) | Only the **latest** published month: the dashboard, flat details and Pay. No history and no month selector |
+| Admin (`nrassociation@gmail.com`, signed in with Google) | All months, history, and every admin screen |
+
+The account is set in `admin.allowedEmail`, and the rule in `residentsSeeLatestMonthOnly` (both in
+`src/app/config/app-config.ts`).
+
+## Admin sign-in (Google), one-time setup
+
+Do these steps signed in as **nrassociation@gmail.com**:
+
+1. Open https://console.cloud.google.com/ and create a project, for example *NR Maintenance*.
+2. Go to **APIs & Services → OAuth consent screen** (also called *Google Auth Platform*).
+   - App name: *Narayanadri Residency*. Support email: nrassociation@gmail.com. Audience: **External**.
+   - Under **Audience → Test users**, add `nrassociation@gmail.com`. Testing mode is fine because only this one account
+     signs in.
+3. Go to **Credentials** (or **Clients**) → **Create credentials → OAuth client ID** → application type **Web application**.
+   - **Authorized JavaScript origins**: `https://ramakrishnaveldandi.github.io` and `http://localhost:4200`
+   - Leave the redirect URIs empty.
+4. Copy the **Client ID** (it ends in `.apps.googleusercontent.com`). Paste it into `admin.googleClientId` in
+   `src/app/config/app-config.ts`, then commit and push. A client ID is not a secret, so it's safe in a public repo.
+5. Open the site → **Admin login** → **Sign in with Google**. Any other Google account is refused.
+
+If you use the Apps Script backend, also set `GOOGLE_CLIENT_ID` (the same value) in its script properties.
 
 ## Data modes
 
@@ -74,13 +95,14 @@ node -e "console.log(require('crypto').createHash('sha256').update('YOUR-PASSPHR
 - Published months are `public/data/index.json` and `public/data/YYYY-MM.json`, committed to the repo.
 - The admin's changes (imports and payments) are saved in that admin's browser. They go live after **Reports & backup →
   Download data files**, committing the files to `public/data/`, and pushing.
-- This mode needs zero setup and costs nothing. The admin passphrase here is only a convenience gate, because static hosting
-  cannot keep a secret (SRS §6).
+- This mode needs zero setup and costs nothing. **Limitation:** the Google sign-in check and the latest-month-only rule run
+  in the browser. Residents never see older months in the app. But every month's file sits on the public site
+  (`data/2026-10.json`), so someone who knows the URL can download it. A static site cannot hide files (SRS §6).
 
 **API mode** (`apiUrl` set to a Google Apps Script web app). See [`backend/apps-script/README.md`](backend/apps-script/README.md).
 
-- Data lives in a Google Sheet, admin writes are checked on the server, residents can submit UTRs, and you can import from
-  Google Drive.
+- Data lives in a Google Sheet. The server verifies the admin's Google sign-in on every admin request and only gives older
+  months to the admin, so the restriction is real. Residents can submit UTRs, and you can import from Google Drive.
 
 ## Deploying to GitHub Pages
 

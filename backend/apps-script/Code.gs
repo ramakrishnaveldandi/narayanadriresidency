@@ -8,8 +8,13 @@
  *   Audit    | at, actor, action, month, details
  *
  * Script properties (Project Settings -> Script properties):
- *   ADMIN_KEY        - admin passphrase (required)
+ *   GOOGLE_CLIENT_ID - OAuth web client ID used by the frontend's "Sign in with Google" (required)
+ *   ADMIN_EMAIL      - the only admin account (default nrassociation@gmail.com)
  *   DRIVE_FOLDER_ID  - Google Drive folder holding monthly Excel files / images (optional)
+ *
+ * Access rules:
+ *   - Public (residents): read the LATEST published month only; submit unverified payment references.
+ *   - Admin (verified Google ID token for ADMIN_EMAIL): read all months, publish, record/verify/void payments, Drive import.
  *
  * Deploy as a web app: Execute as "Me", access "Anyone". See README.md.
  */
@@ -26,8 +31,8 @@ var SHEETS = {
 function doGet(e) {
   return handle_(function () {
     var p = e.parameter || {};
-    if (p.action === 'index') return listMonths_();
-    if (p.action === 'month') return getMonth_(p.month);
+    if (p.action === 'index') return readIndex_(false);
+    if (p.action === 'month') return readMonth_(p.month, false);
     throw new Error('Unknown action');
   });
 }
@@ -35,15 +40,17 @@ function doGet(e) {
 function doPost(e) {
   return handle_(function () {
     var body = JSON.parse(e.postData.contents || '{}');
-    var actor = String(body.actor || 'admin').slice(0, 60);
 
-    // Public action: residents submit a payment reference (stored unverified).
+    // Public actions.
     if (body.action === 'submitPayment') return submitPayment_(body.payment);
+    var admin = verifyAdmin_(body.idToken); // null when not a valid admin token
+    if (body.action === 'index') return readIndex_(!!admin);
+    if (body.action === 'month') return readMonth_(body.month, !!admin);
 
-    requireAdmin_(body.key);
+    // Everything below is admin-only.
+    if (!admin) throw new Error('Administrator sign-in required (only ' + adminEmail_() + ').');
+    var actor = admin.email;
     switch (body.action) {
-      case 'verifyKey':
-        return true;
       case 'publishMonth':
         return withLock_(function () { return publishMonth_(body.bill, body.correctionReason, actor); });
       case 'addPayment':
@@ -70,13 +77,56 @@ function handle_(fn) {
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 
-function requireAdmin_(key) {
-  var expected = PropertiesService.getScriptProperties().getProperty('ADMIN_KEY');
-  if (!expected) throw new Error('ADMIN_KEY is not configured on the server.');
-  if (!key || key !== expected) {
-    Utilities.sleep(800); // slow down guessing
-    throw new Error('Invalid admin passphrase.');
+// ------------------------------------------------------------------ auth
+
+function adminEmail_() {
+  return (PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL') || 'nrassociation@gmail.com').toLowerCase();
+}
+
+/**
+ * Verifies a Google ID token with Google's tokeninfo endpoint and checks that it was
+ * issued to our OAuth client for the admin email. Results are cached for 5 minutes.
+ * Returns { email } or null.
+ */
+function verifyAdmin_(idToken) {
+  if (!idToken) return null;
+  var clientId = PropertiesService.getScriptProperties().getProperty('GOOGLE_CLIENT_ID');
+  if (!clientId) throw new Error('GOOGLE_CLIENT_ID is not configured on the server.');
+  var cache = CacheService.getScriptCache();
+  var key = 'tok_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, idToken));
+  var cached = cache.get(key);
+  if (cached) return cached === 'no' ? null : { email: cached };
+
+  var res = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), { muteHttpExceptions: true });
+  var ok = null;
+  if (res.getResponseCode() === 200) {
+    var t = JSON.parse(res.getContentText());
+    var validIssuer = t.iss === 'accounts.google.com' || t.iss === 'https://accounts.google.com';
+    var notExpired = Number(t.exp) * 1000 > Date.now();
+    var verified = t.email_verified === true || t.email_verified === 'true';
+    if (validIssuer && notExpired && verified && t.aud === clientId && String(t.email).toLowerCase() === adminEmail_()) {
+      ok = { email: String(t.email).toLowerCase() };
+    }
   }
+  cache.put(key, ok ? ok.email : 'no', 300);
+  return ok;
+}
+
+// ------------------------------------------------------------------ visibility
+
+function latestMonth_() {
+  var list = listMonths_();
+  return list.length ? list[0].month : null;
+}
+
+function readIndex_(isAdmin) {
+  var list = listMonths_();
+  return isAdmin ? list : list.slice(0, 1);
+}
+
+function readMonth_(month, isAdmin) {
+  if (!isAdmin && month !== latestMonth_()) return null; // residents see only the latest month
+  return getMonth_(month);
 }
 
 function withLock_(fn) {
@@ -170,6 +220,7 @@ function publishMonth_(bill, correctionReason, actor) {
 function submitPayment_(p) {
   if (!p) throw new Error('Missing payment.');
   if (!p.txnRef || !String(p.txnRef).trim()) throw new Error('Transaction reference is required.');
+  if (p.month !== latestMonth_()) throw new Error('Payments can only be submitted for the latest month.');
   p.source = 'resident';
   p.verified = false;
   p.recordedBy = 'resident';

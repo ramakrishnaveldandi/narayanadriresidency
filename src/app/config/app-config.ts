@@ -67,13 +67,18 @@ export const APP_CONFIG = {
   /** Outstanding amounts at or below this many rupees count as Paid. */
   paidTolerance: 1,
 
-  /**
-   * Static mode only: SHA-256 hex of the admin passphrase. This is a convenience
-   * gate, NOT security - static mode can only change data in the admin's own
-   * browser. Real protection comes from the Apps Script backend's ADMIN_KEY.
-   * Default passphrase: "narayanadri-admin" (change it).
-   */
-  staticAdminPassphraseSha256: '6972f7fc9f4abfe809d7eb42c9e34eaf328e371abc5fcefd7499c4ec9577065d',
+  admin: {
+    /** The only account allowed into the admin area ("Sign in with Google"). */
+    allowedEmail: 'nrassociation@gmail.com',
+    /**
+     * OAuth 2.0 Web client ID from Google Cloud Console (see README "Admin sign-in").
+     * Client IDs are public identifiers - safe to commit. Empty = sign-in disabled.
+     */
+    googleClientId: '',
+  },
+
+  /** Residents see only the most recent published month; the admin sees every month. */
+  residentsSeeLatestMonthOnly: true,
 
   importTemplate: NARAYANADRI_TEMPLATE,
 };

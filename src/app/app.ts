@@ -16,7 +16,9 @@ import { DataService } from './core/data.service';
         </a>
         <nav>
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
-          <a routerLink="/history" routerLinkActive="active">History</a>
+          @if (auth.isAdmin()) {
+            <a routerLink="/history" routerLinkActive="active">History</a>
+          }
           <a routerLink="/admin" routerLinkActive="active">{{ auth.isAdmin() ? 'Admin' : 'Admin login' }}</a>
         </nav>
       </div>

@@ -82,7 +82,7 @@ export class Dashboard {
   protected readonly showStatus = APP_CONFIG.visibility === 'full';
   protected readonly query = signal('');
 
-  protected readonly selected = computed(() => this.month() || this.data.latestMonth());
+  protected readonly selected = computed(() => this.data.resolveMonth(this.month()));
 
   protected readonly record = resource({
     params: () => this.selected() ?? undefined,
