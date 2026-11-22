@@ -34,9 +34,7 @@
             ],
             "allowedCommonJsDependencies": [
               "qrcode",
-              "dijkstrajs",
-              "tesseract.js",
-              "regenerator-runtime/runtime"
+              "dijkstrajs"
             ]
           },
           "configurations": {
