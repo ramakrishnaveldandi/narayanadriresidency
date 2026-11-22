@@ -15,7 +15,6 @@ GitHub Pages.
 | Payment proof | Resident enters the UTR. It goes to the backend (API mode) or into a pre-filled WhatsApp message (static mode). Stays "awaiting verification" until an admin checks it | FR-05/06, §9 |
 | History | Every published month, for one flat or the whole apartment. **Admin only** | FR-07 |
 | Admin import | Upload Excel/CSV (or pick from Google Drive). Header and month are detected automatically. Column roles are mapped with a template, the grid can be edited, the data is validated, then published. Re-publishing needs a correction reason and is logged | FR-01, FR-08, §5 |
-| Image months | Upload a screenshot of the sheet and the figures are **read automatically** (OCR). Every flat is recomputed from its meter readings and the water tariff and cross-checked against the TOTAL. Rows that agree are marked Confirmed; any that don't are highlighted for the admin. Manual entry is still available | FR-02 |
 | Payments | Record verified payments (full or partial, several per month). Verify or reject resident submissions. Void with a reason. Duplicate UTRs are blocked | FR-06 |
 | Reconcile | Upload a bank or UPI statement. Credits are matched to flats by UTR or by the flat number in the narration, then recorded or verified line by line | FR-06 |
 | Reports & backup | Monthly `.xlsx` report (bill, balances, payments, meter details) and a full JSON backup | FR-08, NFR |
@@ -130,7 +129,7 @@ The app uses hash URLs (`#/flat/101`), so deep links work on Pages without any 4
   administrator records or verifies a payment.
 - Some UPI apps limit pre-filled amounts when paying a personal (non-merchant) UPI ID. If that happens, residents can scan
   the printed QR and type the amount. Test with Google Pay, PhonePe and Paytm before launch.
-- Image reading works best on a **screenshot** of the sheet, such as the image shared on WhatsApp. A phone photo taken at an angle or in poor light may not be read. In that case, use the Excel file or "Enter manually instead". The first image read downloads the OCR engine (a few MB) from jsDelivr; after that the browser has it cached.
+- Months are imported from the **Excel sheet** only. Image upload and OCR were removed because Excel is exact and faster. Keep the same column layout each month; if it changes, adjust the column mapping on the import screen.
 
 ## Project layout
 
@@ -141,6 +140,6 @@ src/app/pages/                  dashboard, flat detail, pay, history
 src/app/pages/admin/            login, import, payments, reconcile, reports, audit
 public/data/                    published months (static mode)
 backend/apps-script/            optional Google Sheets + Drive backend
-samples/Oct-2026.xlsx           October 2026 sheet rebuilt from Oct-2026.jpeg
+samples/Oct-2026.xlsx           October 2026 sheet (sample for testing the import)
 scripts/seed-oct-2026.ts        builds the sample and the seed JSON
 ```
