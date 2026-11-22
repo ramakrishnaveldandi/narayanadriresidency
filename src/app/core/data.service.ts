@@ -74,13 +74,27 @@ export class DataService {
 
   // ------------------------------------------------------------------ reads
 
+  /** True until the first month list has arrived (pages show a loader, not "no data"). */
+  readonly indexLoading = signal(true);
+  /** Error from loading the month list, if any. */
+  readonly indexError = signal<string | null>(null);
+
   loadIndex(force = false): Promise<MonthIndexEntry[]> {
     if (!this.indexPromise || force) {
-      this.indexPromise = this.fetchIndex().then((list) => {
-        const sorted = [...list].sort((a, b) => compareMonthsDesc(a.month, b.month));
-        this.allIndex.set(sorted);
-        return sorted;
-      });
+      if (!this.allIndex().length) this.indexLoading.set(true);
+      this.indexError.set(null);
+      this.indexPromise = this.fetchIndex()
+        .then((list) => {
+          const sorted = [...list].sort((a, b) => compareMonthsDesc(a.month, b.month));
+          this.allIndex.set(sorted);
+          return sorted;
+        })
+        .catch((e: Error) => {
+          this.indexError.set(e.message || 'Could not load data.');
+          this.indexPromise = undefined; // allow a retry
+          throw e;
+        })
+        .finally(() => this.indexLoading.set(false));
     }
     return this.indexPromise;
   }

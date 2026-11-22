@@ -7,10 +7,11 @@ import { DataService } from '../core/data.service';
 import { AdminAuthService } from '../core/admin-auth.service';
 import { CellPipe, InrPipe, MonthLabelPipe, StatusClassPipe } from '../shared/format';
 import { MonthSelect } from '../shared/month-select';
+import { PageLoader } from '../shared/page-loader';
 
 @Component({
   selector: 'app-flat-detail',
-  imports: [RouterLink, DatePipe, InrPipe, CellPipe, MonthLabelPipe, StatusClassPipe, MonthSelect],
+  imports: [RouterLink, DatePipe, InrPipe, CellPipe, MonthLabelPipe, StatusClassPipe, MonthSelect, PageLoader],
   template: `
     <a routerLink="/" [queryParams]="{ month: selected() }" class="small">← All flats</a>
     <div class="row" style="align-items:flex-end;margin:8px 0 16px">
@@ -21,8 +22,8 @@ import { MonthSelect } from '../shared/month-select';
       <app-month-select [value]="selected()" />
     </div>
 
-    @if (record.isLoading()) {
-      <div class="empty">Loading…</div>
+    @if (data.indexLoading() || record.isLoading()) {
+      <app-page-loader message="Loading flat {{ flat() }}…" />
     } @else if (!bill()) {
       <div class="empty card">No bill for flat {{ flat() }} in {{ selected() | monthLabel }}.</div>
     } @else {
@@ -119,7 +120,7 @@ import { MonthSelect } from '../shared/month-select';
 export class FlatDetail {
   readonly flat = input.required<string>();
   readonly month = input<string>();
-  private readonly data = inject(DataService);
+  protected readonly data = inject(DataService);
   protected readonly auth = inject(AdminAuthService);
   protected readonly tolerance = APP_CONFIG.paidTolerance;
 

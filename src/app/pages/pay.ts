@@ -7,18 +7,19 @@ import { DataService } from '../core/data.service';
 import { buildUpiUri, looksLikeUtr } from '../core/upi';
 import { InrPipe, MonthLabelPipe } from '../shared/format';
 import { QrCode } from '../shared/qr-code';
+import { PageLoader } from '../shared/page-loader';
 import { monthLabel } from '../core/billing';
 
 @Component({
   selector: 'app-pay',
-  imports: [RouterLink, FormsModule, InrPipe, MonthLabelPipe, QrCode],
+  imports: [RouterLink, FormsModule, InrPipe, MonthLabelPipe, QrCode, PageLoader],
   template: `
     <a [routerLink]="['/flat', flat()]" [queryParams]="{ month: selected() }" class="small">← Flat {{ flat() }}</a>
     <h1 style="margin-top:8px">Pay maintenance</h1>
     <p class="muted">Flat {{ flat() }} · {{ selected() | monthLabel }}</p>
 
-    @if (record.isLoading()) {
-      <div class="empty">Loading…</div>
+    @if (data.indexLoading() || record.isLoading()) {
+      <app-page-loader message="Preparing payment details…" />
     } @else if (!summary()) {
       <div class="empty card">No bill found.</div>
     } @else {

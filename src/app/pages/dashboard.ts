@@ -7,23 +7,27 @@ import type { FlatSummary } from '../core/models';
 import { InrPipe, MonthLabelPipe, StatusClassPipe } from '../shared/format';
 import { MonthSelect, compareFlats, floorOf } from '../shared/month-select';
 import { SourceFileViewer } from '../shared/source-file-viewer';
+import { PageLoader } from '../shared/page-loader';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, InrPipe, MonthLabelPipe, StatusClassPipe, MonthSelect, SourceFileViewer],
+  imports: [RouterLink, InrPipe, MonthLabelPipe, StatusClassPipe, MonthSelect, SourceFileViewer, PageLoader],
   template: `
     <div class="row" style="align-items:flex-end;margin-bottom:16px">
       <div class="spacer">
         <h1>{{ name }}</h1>
-        <div class="muted">Monthly maintenance · {{ selected() | monthLabel }}</div>
+        <div class="muted">Monthly maintenance{{ selected() ? " · " + (selected() | monthLabel) : "" }}</div>
       </div>
       <app-month-select [value]="selected()" />
     </div>
 
-    @if (record.isLoading()) {
-      <div class="empty">Loading…</div>
-    } @else if (record.error()) {
-      <div class="alert error">Could not load data: {{ $any(record.error())?.message }}</div>
+    @if (loading()) {
+      <app-page-loader variant="cards" message="Loading this month's maintenance…" />
+    } @else if (loadError()) {
+      <div class="alert error">
+        Could not load data: {{ loadError() }}
+        <button class="btn sm" type="button" (click)="retry()">Try again</button>
+      </div>
     } @else if (!record.value()) {
       <div class="empty card">No maintenance data has been published yet.</div>
     } @else {
@@ -81,7 +85,7 @@ import { SourceFileViewer } from '../shared/source-file-viewer';
 export class Dashboard {
   /** ?month= query parameter. */
   readonly month = input<string>();
-  private readonly data = inject(DataService);
+  protected readonly data = inject(DataService);
   protected readonly name = APP_CONFIG.apartmentName;
   protected readonly showAmounts = APP_CONFIG.visibility !== 'flats-only';
   protected readonly showStatus = APP_CONFIG.visibility === 'full';
@@ -95,7 +99,16 @@ export class Dashboard {
   });
 
   constructor() {
-    void this.data.loadIndex();
+    void this.data.loadIndex().catch(() => undefined);
+  }
+
+  /** Loading until the month list AND the month's bill have arrived. */
+  protected readonly loading = computed(() => this.data.indexLoading() || this.record.isLoading());
+  protected readonly loadError = computed(() => this.data.indexError() ?? ((this.record.error() as Error | undefined)?.message) ?? null);
+
+  protected retry(): void {
+    void this.data.loadIndex(true).catch(() => undefined);
+    this.record.reload();
   }
 
   protected readonly summary = computed(() => {
