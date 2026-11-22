@@ -3,7 +3,19 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { APP_CONFIG } from '../../config/app-config';
 import { DataService, DriveFile, UploadedFile } from '../../core/data.service';
-import { detectMonth, extractFlats, parseSheet, sumExpenses, toNumber, validateBill, type Row } from '../../core/excel-import';
+import {
+  describeSheets,
+  detectMonth,
+  extractFlats,
+  isPaidStatus,
+  parseSheet,
+  pickLatestSheet,
+  sumExpenses,
+  toNumber,
+  validateBill,
+  type Row,
+  type SheetInfo,
+} from '../../core/excel-import';
 import type { BillColumn, BillSource, ColumnRole, FlatBill, MonthBill } from '../../core/models';
 import { readWorkbook, type RawSheet } from '../../core/spreadsheet';
 import { InrPipe, MonthLabelPipe } from '../../shared/format';
@@ -77,15 +89,26 @@ const EXCEL_TYPES: Record<string, string> = {
           <label class="field" style="grid-column: span 2">Title <input [ngModel]="title()" (ngModelChange)="title.set($event)" /></label>
           @if (sheets().length > 1) {
             <label class="field">
-              Sheet
+              Sheet ({{ sheets().length }} in this workbook)
               <select (change)="selectSheet(+$any($event.target).value)">
-                @for (s of sheets(); track s.name; let i = $index) {
-                  <option [value]="i" [selected]="i === sheetIndex()">{{ s.name }}</option>
+                @for (s of sheetInfo(); track s.index) {
+                  @if (s.hasHeader) {
+                    <option [value]="s.index" [selected]="s.index === sheetIndex()">{{ s.name }}{{ s.month ? ' - ' + (s.month | monthLabel) : '' }}</option>
+                  }
                 }
               </select>
             </label>
           }
         </div>
+        @if (sheets().length > 1) {
+          <p class="small muted" style="margin:0">The latest month's sheet is selected automatically. Choose another sheet to import an older month.</p>
+        }
+        @if (titleMonth() && titleMonth() !== month()) {
+          <div class="alert warn small">
+            The sheet name says <strong>{{ sheetNameMonth() | monthLabel }}</strong> but the title row says
+            <strong>{{ titleMonth() | monthLabel }}</strong>. Check which month this bill is for before publishing.
+          </div>
+        }
         @if (month() && alreadyPublished()) {
           <div class="alert warn small">
             {{ month() | monthLabel }} is already published. Publishing again replaces it as a logged correction - payments are kept.
@@ -134,6 +157,9 @@ const EXCEL_TYPES: Record<string, string> = {
                 }
                 <th class="num">Total due</th>
                 <th class="num">Line-item sum</th>
+                @if (hasStatus()) {
+                  <th>Status</th>
+                }
                 <th></th>
               </tr>
             </thead>
@@ -146,6 +172,15 @@ const EXCEL_TYPES: Record<string, string> = {
                   }
                   <td><input class="num" [value]="isNaN(f.total) ? '' : f.total" (change)="setTotal(i, $any($event.target).value)" /></td>
                   <td class="num small">{{ hasExpenses() ? (sum(f) | inr) : '-' }}</td>
+                  @if (hasStatus()) {
+                    <td>
+                      @if (isPaid(f)) {
+                        <span class="badge paid">{{ f.sheetStatus }} · Paid</span>
+                      } @else {
+                        <span class="muted small">{{ f.sheetStatus || '-' }}</span>
+                      }
+                    </td>
+                  }
                   <td><button class="btn sm danger" type="button" (click)="removeRow(i)" aria-label="Remove row">✕</button></td>
                 </tr>
               }
@@ -157,7 +192,7 @@ const EXCEL_TYPES: Record<string, string> = {
                   <td></td>
                 }
                 <td class="num">{{ grandTotal() | inr }}</td>
-                <td colspan="2"></td>
+                <td [attr.colspan]="hasStatus() ? 3 : 2"></td>
               </tr>
             </tfoot>
           </table>
@@ -177,6 +212,13 @@ const EXCEL_TYPES: Record<string, string> = {
         }
         @if (alreadyPublished()) {
           <label class="field">Correction reason (required to replace a published month) <input [(ngModel)]="correctionReason" /></label>
+        }
+        @if (paidInSheet().length) {
+          <label class="small">
+            <input type="checkbox" [(ngModel)]="markPaidFromSheet" />
+            Mark the <strong>{{ paidInSheet().length }}</strong> flats with Status "P" in the sheet as <strong>Paid</strong>
+            (records a verified payment of the balance due for each).
+          </label>
         }
         <label class="small"><input type="checkbox" [(ngModel)]="reviewed" /> I have checked the figures against the Excel sheet.</label>
         <div class="row">
@@ -218,12 +260,18 @@ export class AdminImport {
   protected readonly columns = signal<BillColumn[]>([]);
   protected readonly flats = signal<FlatBill[]>([]);
   protected readonly showInfo = signal(false);
+  protected readonly sheetInfo = signal<SheetInfo[]>([]);
+  protected readonly sheetNameMonth = signal<string | null>(null);
+  protected readonly titleMonth = signal<string | null>(null);
+  protected markPaidFromSheet = true;
   protected correctionReason = '';
   protected reviewed = false;
   protected readonly isNaN = Number.isNaN;
 
   protected readonly alreadyPublished = computed(() => this.data.index().some((m) => m.month === this.month()));
   protected readonly hasExpenses = computed(() => this.columns().some((c) => c.role === 'expense'));
+  protected readonly hasStatus = computed(() => this.columns().some((c) => c.role === 'status'));
+  protected readonly paidInSheet = computed(() => this.flats().filter((f) => isPaidStatus(f.sheetStatus)).map((f) => f.flat));
   protected readonly gridColumns = computed(() =>
     this.columns().filter((c) => c.role === 'expense' || (this.showInfo() && c.role === 'info')),
   );
@@ -275,8 +323,9 @@ export class AdminImport {
       const sheets = await readWorkbook(data);
       this.sheets.set(sheets);
       this.source.set({ fileName: name, kind, driveFileId, importedAt: new Date().toISOString() });
-      const first = Math.max(0, sheets.findIndex((s) => parseSheet(s.rows).headerRowIndex >= 0));
-      this.selectSheet(first);
+      const info = describeSheets(sheets);
+      this.sheetInfo.set(info);
+      this.selectSheet(pickLatestSheet(info));
       if (!this.columns().length) this.error.set('Could not find a header row with a "Flat" column in this file.');
     });
   }
@@ -291,7 +340,10 @@ export class AdminImport {
     this.flats.set(draft.flats);
     const src = this.source();
     if (src) this.source.set({ ...src, sheetName: sheet.name });
-    this.month.set(draft.detectedMonth ?? detectMonth(src?.fileName ?? '', sheet.name) ?? '');
+    // Month: sheet name first (e.g. "OCT 2026"), then the title row, then the file name.
+    this.sheetNameMonth.set(detectMonth(sheet.name));
+    this.titleMonth.set(draft.detectedMonth);
+    this.month.set(this.sheetNameMonth() ?? draft.detectedMonth ?? detectMonth(src?.fileName ?? '') ?? '');
     this.title.set(draft.title || '');
     this.defaultTitle();
   }
@@ -328,6 +380,10 @@ export class AdminImport {
     this.flats.update((list) => list.filter((_, j) => j !== i));
   }
 
+  protected isPaid(f: FlatBill): boolean {
+    return isPaidStatus(f.sheetStatus);
+  }
+
   protected sum(f: FlatBill): number {
     return sumExpenses(f, this.columns());
   }
@@ -357,13 +413,15 @@ export class AdminImport {
       version: 1,
     };
     await this.run(async () => {
-      await this.data.publishMonth(bill, this.alreadyPublished() ? this.correctionReason : undefined, this.upload ?? undefined);
+      const markPaid = this.markPaidFromSheet ? this.paidInSheet() : [];
+      await this.data.publishMonth(bill, this.alreadyPublished() ? this.correctionReason : undefined, this.upload ?? undefined, markPaid);
       this.published.set(bill.month);
       const extra =
         this.data.mode === 'static'
           ? ' Export the data files from Reports & backup to make it visible to residents.'
           : ' The Excel file is saved in Google Drive (NR Maintenance / Latest), last month moved to History, and residents now see this month.';
-      this.message.set(`Published ${bill.month} with ${bill.flats.length} flats.${extra}`);
+      const paidNote = markPaid.length ? ` ${markPaid.length} flats marked Paid from the Status column.` : '';
+      this.message.set(`Published ${bill.month} with ${bill.flats.length} flats.${paidNote}${extra}`);
     });
   }
 
@@ -380,6 +438,10 @@ export class AdminImport {
     this.correctionReason = '';
     this.reviewed = false;
     this.upload = null;
+    this.sheetInfo.set([]);
+    this.sheetNameMonth.set(null);
+    this.titleMonth.set(null);
+    this.markPaidFromSheet = true;
   }
 
   // ------------------------------------------------------------- helpers

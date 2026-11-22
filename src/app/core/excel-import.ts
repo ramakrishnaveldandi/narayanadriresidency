@@ -96,7 +96,7 @@ const GENERIC_TOTAL = /^(grand total|total|total due|total amount|amount due|net
 export function buildColumns(header: Row, template?: ImportTemplate): BillColumn[] {
   const usedKeys = new Map<string, number>();
   const columns: BillColumn[] = header.map((h, index) => {
-    const text = String(h ?? '').trim();
+    const text = String(h ?? '').replace(/\s+/g, ' ').trim();
     const base = slug(text);
     const n = (usedKeys.get(base) ?? 0) + 1;
     usedKeys.set(base, n);
@@ -133,6 +133,21 @@ export function buildColumns(header: Row, template?: ImportTemplate): BillColumn
     const pick = candidates.length === 1 ? candidates[0] : upper.length === 1 ? upper[0] : undefined;
     if (pick) pick.role = 'total';
   }
+
+  // Leftover columns (not matched by the template) are classified by position:
+  //  - between the first expense column and TOTAL -> extra charge for the month
+  //    (e.g. "Septic Tank Expenses", "Repair Manjeera"); TOTAL includes them
+  //  - right of TOTAL -> side calculations / helper columns -> ignored
+  const total = columns.find((c) => c.role === 'total');
+  if (total) {
+    const expenseIdx = columns.filter((c) => c.role === 'expense').map((c) => c.sourceIndex);
+    const firstExpense = expenseIdx.length ? Math.min(...expenseIdx) : -1;
+    for (const c of columns) {
+      if (assigned.has(c.sourceIndex) || c.role === 'flat' || c.role === 'total' || c.role === 'status') continue;
+      if (c.sourceIndex > total.sourceIndex) c.role = 'ignore';
+      else if (firstExpense >= 0 && c.sourceIndex > firstExpense && c.sourceHeader) c.role = 'expense';
+    }
+  }
   return columns;
 }
 
@@ -141,18 +156,24 @@ export function extractFlats(rows: Row[], headerRowIndex: number, columns: BillC
   const flatCol = columns.find((c) => c.role === 'flat');
   const totalCol = columns.find((c) => c.role === 'total');
   if (!flatCol) return [];
-  const kept = columns.filter((c) => c.role !== 'ignore' && c.role !== 'flat');
+  const statusCol = columns.find((c) => c.role === 'status');
+  const kept = columns.filter((c) => c.role !== 'ignore' && c.role !== 'flat' && c.role !== 'status');
   const out: FlatBill[] = [];
   for (let r = headerRowIndex + 1; r < rows.length; r++) {
     const row = rows[r] ?? [];
     const rawFlat = row[flatCol.sourceIndex];
     if (rawFlat === null || rawFlat === undefined || String(rawFlat).trim() === '') continue;
     const flat = String(rawFlat).trim().replace(/\.0+$/, '');
-    if (/total|sum|grand/i.test(flat)) continue;
+    // Only rows whose first cell looks like a flat id (101, A-101, B 12, 12A) are flats;
+    // notes and summary lines below the table ("Note:", "Common water usage", …) are skipped.
+    if (!isFlatId(flat)) continue;
     const values: Record<string, CellValue> = {};
     for (const c of kept) values[c.key] = toCell(row[c.sourceIndex]);
     const total = totalCol ? toNumber(row[totalCol.sourceIndex]) : null;
-    out.push({ flat, values, total: total ?? NaN, sourceRow: r + 1 });
+    const bill: FlatBill = { flat, values, total: total ?? NaN, sourceRow: r + 1 };
+    const status = statusCol ? String(row[statusCol.sourceIndex] ?? '').trim() : '';
+    if (status) bill.sheetStatus = status;
+    out.push(bill);
   }
   return out;
 }
@@ -233,4 +254,48 @@ export function validateBill(
 
 function round(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/** Values in a "Status" column that mean the flat has paid. */
+export function isPaidStatus(status: string | undefined): boolean {
+  return /^(p|paid|y|yes|done|received|✓|✔)$/i.test((status ?? '').trim());
+}
+
+export interface SheetInfo {
+  index: number;
+  name: string;
+  month: MonthKey | null;
+  hasHeader: boolean;
+}
+
+/**
+ * Describes every sheet of a workbook: its month (from the sheet name, else the
+ * title row) and whether it has a "Flat" header. A workbook can hold the whole
+ * history (one sheet per month), so the importer defaults to the latest month.
+ */
+export function describeSheets(sheets: { name: string; rows: Row[] }[]): SheetInfo[] {
+  return sheets.map((s, index) => {
+    const h = detectHeaderRow(s.rows);
+    return { index, name: s.name, month: detectMonth(s.name) ?? (h > 0 ? detectMonth(sheetTitle(s.rows, h)) : null), hasHeader: h >= 0 };
+  });
+}
+
+/** Index of the sheet with the latest month (ties: the later sheet); else the last sheet with a header. */
+export function pickLatestSheet(info: SheetInfo[]): number {
+  let best = -1;
+  for (const s of info) {
+    if (!s.hasHeader) continue;
+    if (best < 0) {
+      best = s.index;
+      continue;
+    }
+    const b = info[best];
+    if ((s.month ?? '') >= (b.month ?? '')) best = s.index;
+  }
+  return Math.max(0, best);
+}
+
+/** True for flat identifiers such as 101, A-101, B 12 or 12A. */
+export function isFlatId(text: string): boolean {
+  return /^[A-Za-z]{0,3}[-\s/]?\d{1,4}[A-Za-z]?$/.test(text.trim());
 }

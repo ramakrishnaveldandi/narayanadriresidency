@@ -65,7 +65,7 @@ function doPost(e) {
     var actor = admin.email;
     switch (body.action) {
       case 'publishMonth':
-        return withLock_(function () { return publishMonth_(body.bill, body.correctionReason, actor, body.sourceFile); });
+        return withLock_(function () { return publishMonth_(body.bill, body.correctionReason, actor, body.sourceFile, body.markPaid); });
       case 'addPayment':
         return withLock_(function () { return addPayment_(body.payment, actor, true); });
       case 'updatePayment':
@@ -225,7 +225,7 @@ function toPayment_(r) {
  *   3. the reviewed data is saved next to it as "<month>.json" - residents read this
  *   4. BillLines (analytics) and Audit are updated in the sheet
  */
-function publishMonth_(bill, correctionReason, actor, sourceFile) {
+function publishMonth_(bill, correctionReason, actor, sourceFile, markPaid) {
   if (!bill || !/^20\d{2}-(0[1-9]|1[0-2])$/.test(bill.month)) throw new Error('Invalid month.');
   if (!bill.flats || !bill.flats.length) throw new Error('No flats in bill.');
   var seen = {};
@@ -266,10 +266,38 @@ function publishMonth_(bill, correctionReason, actor, sourceFile) {
 
   deleteRowsWhere_(sheet_('BillLines'), 0, bill.month);
   writeBillLines_(bill);
+  var markedPaid = markPaidFromSheet_(bill, markPaid || [], actor);
   audit_(actor, existing ? 'correct-month' : 'publish', bill.month,
     (existing ? 'v' + bill.version + ': ' + correctionReason + ' - ' : '') +
     bill.flats.length + ' flats from ' + excel.getName() + ' (' + (isLatest ? 'Latest' : 'History') + ')');
-  return { version: bill.version, folder: isLatest ? 'Latest' : 'History', excelFile: excel.getName() };
+  return { version: bill.version, folder: isLatest ? 'Latest' : 'History', excelFile: excel.getName(), markedPaid: markedPaid };
+}
+
+/**
+ * Flats marked paid ("P") in the sheet's Status column get one verified payment for
+ * their remaining balance (nothing is added if already fully paid).
+ */
+function markPaidFromSheet_(bill, flats, actor) {
+  if (!flats.length) return 0;
+  var paid = {};
+  rows_('Payments').forEach(function (r) {
+    var counted = r.month === bill.month && (r.verified === true || r.verified === 'TRUE') && !(r.voided === true || r.voided === 'TRUE');
+    if (counted) paid[String(r.flat)] = (paid[String(r.flat)] || 0) + Number(r.amount);
+  });
+  var now = new Date().toISOString();
+  var rows = [];
+  bill.flats.forEach(function (fl) {
+    if (flats.indexOf(fl.flat) < 0) return;
+    var due = Math.round((fl.total - (paid[fl.flat] || 0)) * 100) / 100;
+    if (due <= 1) return;
+    rows.push(['p_' + Utilities.getUuid(), "'" + bill.month, "'" + fl.flat, due, "'" + now.slice(0, 10), '', 'Sheet status', 'sheet', true,
+      'Status "P" in ' + (bill.source && bill.source.fileName), now, actor, false, '']);
+  });
+  if (!rows.length) return 0;
+  var sh = sheet_('Payments');
+  sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  audit_(actor, 'mark-paid-from-sheet', bill.month, rows.length + ' flats marked Paid from the Status column of the sheet');
+  return rows.length;
 }
 
 function storeExcel_(f, target, month, sourceFile, driveFileId) {

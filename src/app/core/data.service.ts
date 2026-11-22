@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { APP_CONFIG } from '../config/app-config';
-import { compareMonthsDesc, findDuplicateRef, newId } from './billing';
+import { compareMonthsDesc, findDuplicateRef, newId, summarizeFlat } from './billing';
 import type { AuditEntry, MonthBill, MonthIndexEntry, MonthKey, MonthRecord, Payment } from './models';
 import { AdminAuthService } from './admin-auth.service';
 
@@ -109,7 +109,11 @@ export class DataService {
 
   // ------------------------------------------------------------- admin writes
 
-  async publishMonth(bill: MonthBill, correctionReason?: string, upload?: UploadedFile): Promise<void> {
+  /**
+   * Publishes a reviewed month. `markPaid` = flats marked paid ("P") in the sheet's Status
+   * column: each gets a verified payment for its remaining balance.
+   */
+  async publishMonth(bill: MonthBill, correctionReason?: string, upload?: UploadedFile, markPaid: string[] = []): Promise<void> {
     this.auth.requireAdmin();
     const existing = (await this.loadIndex()).some((m) => m.month === bill.month);
     if (existing && !correctionReason?.trim()) {
@@ -117,7 +121,7 @@ export class DataService {
     }
     if (this.mode === 'api') {
       const sourceFile = upload ? { name: upload.name, mimeType: upload.mimeType, base64: toBase64(upload.data) } : undefined;
-      await this.apiPost({ action: 'publishMonth', bill, correctionReason, sourceFile });
+      await this.apiPost({ action: 'publishMonth', bill, correctionReason, sourceFile, markPaid });
     } else {
       const store = this.ensureLocal();
       const prev = store.months[bill.month] ?? (await this.getMonth(bill.month));
@@ -130,6 +134,7 @@ export class DataService {
       record.audit.push(
         this.audit(existing ? 'correct-month' : 'publish', bill.month, existing ? `v${version}: ${correctionReason}` : `${bill.flats.length} flats from ${bill.source.fileName}`),
       );
+      this.applySheetPaid(record, markPaid);
       store.months[bill.month] = record;
       const index = (store.index ?? [...this.index()]).filter((m) => m.month !== bill.month);
       index.push({ month: bill.month, title: bill.title });
@@ -138,6 +143,23 @@ export class DataService {
     }
     this.cache.delete(bill.month);
     await this.loadIndex(true);
+  }
+
+  /** Static mode: verified payments for flats marked "P" in the sheet (balance due only). */
+  private applySheetPaid(record: MonthRecord, flats: string[]): void {
+    const now = new Date().toISOString();
+    let n = 0;
+    for (const flat of flats) {
+      const s = summarizeFlat(record, flat, APP_CONFIG.paidTolerance);
+      if (s.outstanding <= APP_CONFIG.paidTolerance) continue;
+      record.payments.push({
+        id: newId(), month: record.bill.month, flat, amount: s.outstanding, paidAt: now.slice(0, 10),
+        mode: 'Sheet status', source: 'sheet', verified: true, note: `Status "P" in ${record.bill.source.fileName}`,
+        recordedAt: now, recordedBy: this.auth.actor(),
+      });
+      n++;
+    }
+    if (n) record.audit.push(this.audit('mark-paid-from-sheet', record.bill.month, `${n} flats marked Paid from the sheet's Status column`));
   }
 
   async addPayment(input: Omit<Payment, 'id' | 'recordedAt' | 'recordedBy'>): Promise<Payment> {
