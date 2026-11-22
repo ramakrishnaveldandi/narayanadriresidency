@@ -6,11 +6,18 @@
  *   Bills    | month, flat, total, sourceRow, valuesJson
  *   Payments | id, month, flat, amount, paidAt, txnRef, mode, source, verified, note, recordedAt, recordedBy, voided, voidReason
  *   Audit    | at, actor, action, month, details
+ *   BillLines| month, flat, columnKey, label, role, value, total   (one row per line item - for analytics / pivots)
+ *
+ * Google Drive (in the account that deploys the script):
+ *   My Drive / NR Maintenance /            <- drop files here to import them from the app ("Browse Google Drive")
+ *                              Latest /    <- source file (image / Excel) of the latest published month
+ *                              History /   <- previous months' source files, named "YYYY-MM <original name>"
+ *   The folders are created automatically (run setup once); their IDs are saved in script properties.
  *
  * Script properties (Project Settings -> Script properties):
  *   GOOGLE_CLIENT_ID - OAuth web client ID used by the frontend's "Sign in with Google" (required)
- *   ADMIN_EMAIL      - the only admin account (default nrassociation@gmail.com)
- *   DRIVE_FOLDER_ID  - Google Drive folder holding monthly Excel files / images (optional)
+ *   ADMIN_EMAIL      - the only admin account (default nrassociation123@gmail.com)
+ *   ROOT_FOLDER_ID, LATEST_FOLDER_ID, HISTORY_FOLDER_ID - filled in automatically by setup()
  *
  * Access rules:
  *   - Public (residents): read the LATEST published month only; submit unverified payment references.
@@ -24,6 +31,7 @@ var SHEETS = {
   Bills: ['month', 'flat', 'total', 'sourceRow', 'valuesJson'],
   Payments: ['id', 'month', 'flat', 'amount', 'paidAt', 'txnRef', 'mode', 'source', 'verified', 'note', 'recordedAt', 'recordedBy', 'voided', 'voidReason'],
   Audit: ['at', 'actor', 'action', 'month', 'details'],
+  BillLines: ['month', 'flat', 'columnKey', 'label', 'role', 'value', 'total'],
 };
 
 // ------------------------------------------------------------------ routing
@@ -33,6 +41,7 @@ function doGet(e) {
     var p = e.parameter || {};
     if (p.action === 'index') return readIndex_(false);
     if (p.action === 'month') return readMonth_(p.month, false);
+    if (p.action === 'sourceFile') return readSourceFile_(p.month, false);
     throw new Error('Unknown action');
   });
 }
@@ -46,13 +55,14 @@ function doPost(e) {
     var admin = verifyAdmin_(body.idToken); // null when not a valid admin token
     if (body.action === 'index') return readIndex_(!!admin);
     if (body.action === 'month') return readMonth_(body.month, !!admin);
+    if (body.action === 'sourceFile') return readSourceFile_(body.month, !!admin);
 
     // Everything below is admin-only.
     if (!admin) throw new Error('Administrator sign-in required (only ' + adminEmail_() + ').');
     var actor = admin.email;
     switch (body.action) {
       case 'publishMonth':
-        return withLock_(function () { return publishMonth_(body.bill, body.correctionReason, actor); });
+        return withLock_(function () { return publishMonth_(body.bill, body.correctionReason, actor, body.sourceFile); });
       case 'addPayment':
         return withLock_(function () { return addPayment_(body.payment, actor, true); });
       case 'updatePayment':
@@ -80,7 +90,7 @@ function handle_(fn) {
 // ------------------------------------------------------------------ auth
 
 function adminEmail_() {
-  return (PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL') || 'nrassociation@gmail.com').toLowerCase();
+  return (PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL') || 'nrassociation123@gmail.com').toLowerCase();
 }
 
 /**
@@ -122,6 +132,19 @@ function latestMonth_() {
 function readIndex_(isAdmin) {
   var list = listMonths_();
   return isAdmin ? list : list.slice(0, 1);
+}
+
+/** Source image / Excel of a month from Drive (residents: latest month only). */
+function readSourceFile_(month, isAdmin) {
+  if (!isAdmin && month !== latestMonth_()) return null;
+  var m = rows_('Months').filter(function (r) { return r.month === month; })[0];
+  if (!m) return null;
+  var src = JSON.parse(m.sourceJson || '{}');
+  if (!src.driveFileId) return null;
+  var file = DriveApp.getFileById(src.driveFileId);
+  if (file.getSize() > 15 * 1024 * 1024) throw new Error('Source file is too large to display.');
+  var blob = file.getBlob();
+  return { name: file.getName(), mimeType: blob.getContentType(), base64: Utilities.base64Encode(blob.getBytes()) };
 }
 
 function readMonth_(month, isAdmin) {
@@ -187,7 +210,7 @@ function toPayment_(r) {
 
 // ------------------------------------------------------------------ writes
 
-function publishMonth_(bill, correctionReason, actor) {
+function publishMonth_(bill, correctionReason, actor, sourceFile) {
   if (!bill || !/^20\d{2}-(0[1-9]|1[0-2])$/.test(bill.month)) throw new Error('Invalid month.');
   if (!bill.flats || !bill.flats.length) throw new Error('No flats in bill.');
   var seen = {};
@@ -200,21 +223,50 @@ function publishMonth_(bill, correctionReason, actor) {
 
   var months = sheet_('Months');
   var existing = findRowIndex_(months, 0, bill.month);
+  if (existing > 0 && (!correctionReason || !String(correctionReason).trim())) {
+    throw new Error(bill.month + ' is already published; a correction reason is required.');
+  }
+
+  // Save the source image / Excel to Drive: Latest/ for the newest month (older Latest files move to History/).
+  bill.source = bill.source || {};
+  var stored = storeSourceFile_(bill.month, sourceFile, bill.source.driveFileId);
+  if (stored) {
+    bill.source.driveFileId = stored.id;
+    bill.source.driveFileName = stored.name;
+    bill.source.driveFolder = stored.folder;
+  }
+
   var version = 1;
   if (existing > 0) {
-    if (!correctionReason || !String(correctionReason).trim()) throw new Error(bill.month + ' is already published; a correction reason is required.');
     version = Number(months.getRange(existing, 3).getValue()) + 1;
     months.deleteRow(existing);
     deleteRowsWhere_(sheet_('Bills'), 0, bill.month);
+    deleteRowsWhere_(sheet_('BillLines'), 0, bill.month);
   }
   var now = new Date().toISOString();
   months.appendRow(["'" + bill.month, bill.title, version, now, actor, JSON.stringify(bill.columns), JSON.stringify(bill.source)]);
   var billRows = bill.flats.map(function (f) { return ["'" + bill.month, "'" + f.flat, f.total, f.sourceRow || '', JSON.stringify(f.values || {})]; });
   var bills = sheet_('Bills');
   bills.getRange(bills.getLastRow() + 1, 1, billRows.length, billRows[0].length).setValues(billRows);
+  writeBillLines_(bill);
   audit_(actor, existing > 0 ? 'correct-month' : 'publish', bill.month,
     existing > 0 ? 'v' + version + ': ' + correctionReason : bill.flats.length + ' flats from ' + (bill.source && bill.source.fileName));
-  return { version: version };
+  return { version: version, driveFile: stored };
+}
+
+/** Long-format copy of every line item, handy for pivot tables / Looker Studio. */
+function writeBillLines_(bill) {
+  var cols = (bill.columns || []).filter(function (c) { return c.role !== 'ignore' && c.role !== 'flat'; });
+  var lines = [];
+  bill.flats.forEach(function (f) {
+    cols.forEach(function (c) {
+      var v = f.values ? f.values[c.key] : null;
+      lines.push(["'" + bill.month, "'" + f.flat, c.key, c.label, c.role, v === undefined || v === null ? '' : v, f.total]);
+    });
+  });
+  if (!lines.length) return;
+  var sh = sheet_('BillLines');
+  sh.getRange(sh.getLastRow() + 1, 1, lines.length, lines[0].length).setValues(lines);
 }
 
 function submitPayment_(p) {
@@ -272,39 +324,115 @@ function updatePayment_(month, id, patch, reason, actor) {
 
 // ------------------------------------------------------------------ Drive
 
-function listDriveFiles_() {
-  var folderId = PropertiesService.getScriptProperties().getProperty('DRIVE_FOLDER_ID');
-  if (!folderId) throw new Error('DRIVE_FOLDER_ID is not configured on the server.');
-  var it = DriveApp.getFolderById(folderId).getFiles();
-  var out = [];
-  while (it.hasNext()) {
-    var f = it.next();
-    var mime = f.getMimeType();
-    if (/spreadsheet|excel|csv|image\//i.test(mime) || /\.(xlsx|xls|csv)$/i.test(f.getName())) {
-      out.push({ id: f.getId(), name: f.getName(), mimeType: mime, modifiedTime: f.getLastUpdated().toISOString() });
-    }
+/** NR Maintenance / Latest / History folders, created on first use. */
+function folders_() {
+  var props = PropertiesService.getScriptProperties();
+  var root = folderProp_(props, 'ROOT_FOLDER_ID', function () {
+    var it = DriveApp.getRootFolder().getFoldersByName('NR Maintenance');
+    return it.hasNext() ? it.next() : DriveApp.createFolder('NR Maintenance');
+  });
+  var latest = folderProp_(props, 'LATEST_FOLDER_ID', function () { return childFolder_(root, 'Latest'); });
+  var history = folderProp_(props, 'HISTORY_FOLDER_ID', function () { return childFolder_(root, 'History'); });
+  return { root: root, latest: latest, history: history };
+}
+
+function folderProp_(props, key, create) {
+  var id = props.getProperty(key);
+  if (id) {
+    try {
+      var f = DriveApp.getFolderById(id);
+      if (!f.isTrashed()) return f;
+    } catch (e) { /* deleted - recreate */ }
   }
+  var folder = create();
+  props.setProperty(key, folder.getId());
+  return folder;
+}
+
+function childFolder_(parent, name) {
+  var it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+function inOurFolders_(file, f) {
+  var ids = [f.root.getId(), f.latest.getId(), f.history.getId()];
+  var parents = file.getParents();
+  while (parents.hasNext()) if (ids.indexOf(parents.next().getId()) >= 0) return true;
+  return false;
+}
+
+/**
+ * Stores the month's source file. Newest month -> Latest/ (everything previously in
+ * Latest/ is moved to History/). Back-filled older month -> History/ directly.
+ */
+function storeSourceFile_(month, sourceFile, driveFileId) {
+  if (!sourceFile && !driveFileId) return null;
+  var f = folders_();
+  var latest = latestMonth_();
+  var isLatest = !latest || month >= latest;
+  var target = isLatest ? f.latest : f.history;
+  var prefix = month + ' ';
+  var file;
+  if (sourceFile && sourceFile.base64) {
+    var bytes = Utilities.base64Decode(sourceFile.base64);
+    if (bytes.length > 25 * 1024 * 1024) throw new Error('File is larger than 25 MB.');
+    var name = String(sourceFile.name || 'maintenance').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120);
+    if (isLatest) archiveLatest_(f, null);
+    file = target.createFile(Utilities.newBlob(bytes, sourceFile.mimeType || 'application/octet-stream', prefix + name));
+  } else {
+    file = DriveApp.getFileById(driveFileId);
+    if (!inOurFolders_(file, f)) throw new Error('The selected Drive file is not inside the NR Maintenance folder.');
+    if (isLatest) archiveLatest_(f, file.getId());
+    if (file.getName().indexOf(prefix) !== 0) file.setName(prefix + file.getName());
+    file.moveTo(target);
+  }
+  return { id: file.getId(), name: file.getName(), folder: isLatest ? 'Latest' : 'History' };
+}
+
+function archiveLatest_(f, keepId) {
+  var it = f.latest.getFiles();
+  while (it.hasNext()) {
+    var file = it.next();
+    if (file.getId() !== keepId) file.moveTo(f.history);
+  }
+}
+
+/** Files the admin can import from: the NR Maintenance folder itself and Latest/. */
+function listDriveFiles_() {
+  var f = folders_();
+  var out = [];
+  [[f.root, 'NR Maintenance'], [f.latest, 'Latest']].forEach(function (pair) {
+    var it = pair[0].getFiles();
+    while (it.hasNext()) {
+      var file = it.next();
+      var mime = file.getMimeType();
+      if (/spreadsheet|excel|csv|image\//i.test(mime) || /\.(xlsx|xls|csv)$/i.test(file.getName())) {
+        out.push({ id: file.getId(), name: pair[1] + ' / ' + file.getName(), mimeType: mime, modifiedTime: file.getLastUpdated().toISOString() });
+      }
+    }
+  });
   return out.sort(function (a, b) { return a.modifiedTime < b.modifiedTime ? 1 : -1; });
 }
 
 function getDriveFile_(id) {
-  var folderId = PropertiesService.getScriptProperties().getProperty('DRIVE_FOLDER_ID');
+  var f = folders_();
   var file = DriveApp.getFileById(id);
-  // Only serve files that live in the configured folder.
-  var parents = file.getParents();
-  var allowed = false;
-  while (parents.hasNext()) if (parents.next().getId() === folderId) allowed = true;
-  if (!allowed) throw new Error('File is not in the configured Drive folder.');
+  if (!inOurFolders_(file, f)) throw new Error('File is not in the NR Maintenance folder.');
   var blob = file.getMimeType() === MimeType.GOOGLE_SHEETS
-    ? DriveApp.getFileById(id).getAs('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    ? file.getAs('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     : file.getBlob();
   return { name: file.getName(), mimeType: blob.getContentType(), base64: Utilities.base64Encode(blob.getBytes()) };
 }
 
 // ------------------------------------------------------------------ helpers
 
+/** Run once from the Apps Script editor: creates the sheet tabs and the Drive folders. */
 function setup() {
   Object.keys(SHEETS).forEach(sheet_);
+  var f = folders_();
+  Logger.log('Drive folder: ' + f.root.getUrl());
+  Logger.log('  Latest:  ' + f.latest.getUrl());
+  Logger.log('  History: ' + f.history.getUrl());
 }
 
 function sheet_(name) {

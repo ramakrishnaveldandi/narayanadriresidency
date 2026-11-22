@@ -69,7 +69,7 @@ export const APP_CONFIG = {
 
   admin: {
     /** The only account allowed into the admin area ("Sign in with Google"). */
-    allowedEmail: 'nrassociation@gmail.com',
+    allowedEmail: 'nrassociation123@gmail.com',
     /**
      * OAuth 2.0 Web client ID from Google Cloud Console (see README "Admin sign-in").
      * Client IDs are public identifiers - safe to commit. Empty = sign-in disabled.

@@ -65,19 +65,19 @@ npm run seed         # rebuilds samples/Oct-2026.xlsx and public/data/2026-10.js
 | User | Sees |
 | --- | --- |
 | Residents (no login) | Only the **latest** published month: the dashboard, flat details and Pay. No history and no month selector |
-| Admin (`nrassociation@gmail.com`, signed in with Google) | All months, history, and every admin screen |
+| Admin (`nrassociation123@gmail.com`, signed in with Google) | All months, history, and every admin screen |
 
 The account is set in `admin.allowedEmail`, and the rule in `residentsSeeLatestMonthOnly` (both in
 `src/app/config/app-config.ts`).
 
 ## Admin sign-in (Google), one-time setup
 
-Do these steps signed in as **nrassociation@gmail.com**:
+Do these steps signed in as **nrassociation123@gmail.com**:
 
 1. Open https://console.cloud.google.com/ and create a project, for example *NR Maintenance*.
 2. Go to **APIs & Services → OAuth consent screen** (also called *Google Auth Platform*).
-   - App name: *Narayanadri Residency*. Support email: nrassociation@gmail.com. Audience: **External**.
-   - Under **Audience → Test users**, add `nrassociation@gmail.com`. Testing mode is fine because only this one account
+   - App name: *Narayanadri Residency*. Support email: nrassociation123@gmail.com. Audience: **External**.
+   - Under **Audience → Test users**, add `nrassociation123@gmail.com`. Testing mode is fine because only this one account
      signs in.
 3. Go to **Credentials** (or **Clients**) → **Create credentials → OAuth client ID** → application type **Web application**.
    - **Authorized JavaScript origins**: `https://ramakrishnaveldandi.github.io` and `http://localhost:4200`

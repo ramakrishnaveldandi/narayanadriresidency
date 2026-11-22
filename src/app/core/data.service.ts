@@ -4,6 +4,19 @@ import { compareMonthsDesc, findDuplicateRef, newId } from './billing';
 import type { AuditEntry, MonthBill, MonthIndexEntry, MonthKey, MonthRecord, Payment } from './models';
 import { AdminAuthService } from './admin-auth.service';
 
+/** A file the admin uploaded, sent to the backend to be stored in Drive (Latest/ or History/). */
+export interface UploadedFile {
+  name: string;
+  mimeType: string;
+  data: ArrayBuffer;
+}
+
+export interface SourceFile {
+  name: string;
+  mimeType: string;
+  base64: string;
+}
+
 export interface DriveFile {
   id: string;
   name: string;
@@ -96,14 +109,15 @@ export class DataService {
 
   // ------------------------------------------------------------- admin writes
 
-  async publishMonth(bill: MonthBill, correctionReason?: string): Promise<void> {
+  async publishMonth(bill: MonthBill, correctionReason?: string, upload?: UploadedFile): Promise<void> {
     this.auth.requireAdmin();
     const existing = (await this.loadIndex()).some((m) => m.month === bill.month);
     if (existing && !correctionReason?.trim()) {
       throw new Error(`${bill.month} is already published. Enter a correction reason to replace it.`);
     }
     if (this.mode === 'api') {
-      await this.apiPost({ action: 'publishMonth', bill, correctionReason });
+      const sourceFile = upload ? { name: upload.name, mimeType: upload.mimeType, base64: toBase64(upload.data) } : undefined;
+      await this.apiPost({ action: 'publishMonth', bill, correctionReason, sourceFile });
     } else {
       const store = this.ensureLocal();
       const prev = store.months[bill.month] ?? (await this.getMonth(bill.month));
@@ -181,6 +195,12 @@ export class DataService {
   }
 
   // ------------------------------------------------------------ Google Drive
+
+  /** Original sheet (image / Excel) stored in Drive for a month. API mode only. */
+  async getSourceFile(month: MonthKey): Promise<SourceFile | null> {
+    if (this.mode !== 'api' || !this.canSee(month)) return null;
+    return this.apiRead<SourceFile | null>({ action: 'sourceFile', month });
+  }
 
   listDriveFiles(): Promise<DriveFile[]> {
     this.auth.requireAdmin();
@@ -305,4 +325,11 @@ export class DataService {
     }
     this.hasLocalChanges.set(true);
   }
+}
+
+function toBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
 }
