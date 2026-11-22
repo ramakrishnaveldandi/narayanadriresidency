@@ -35,6 +35,12 @@ export const NARAYANADRI_TEMPLATE: ImportTemplate = {
   ],
 };
 
+/** Column headers of the monthly sheet, in order (used when a month is read from an image). */
+export const NARAYANADRI_SHEET_HEADER = [
+  'FLAT', 'PREVIOUS', 'PRESENT', 'Total', 'SLAB I', 'SLB II Ltrs(', 'Per Ltr in', 'Per Ltr in',
+  'Slab I', 'Slab II', 'FLAT', 'Total', 'Manjeera', 'MNTS', 'TOTAL',
+];
+
 export const APP_CONFIG = {
   apartmentName: 'Narayanadri Residency',
 
@@ -81,4 +87,14 @@ export const APP_CONFIG = {
   residentsSeeLatestMonthOnly: true,
 
   importTemplate: NARAYANADRI_TEMPLATE,
+  sheetHeader: NARAYANADRI_SHEET_HEADER,
+
+  /**
+   * Water billing rules used to cross-check figures read from an image.
+   * Water charge = ceil(min(litres, slabLimit) x rate1 + max(0, litres - slabLimit) x rate2).
+   * Rates printed on the sheet override these automatically.
+   */
+  waterTariff: { slabLimit: 15000, rate1: 0.0279, rate2: 0.0321 },
+  /** Default fixed charges per flat (previous month's values are preferred when available). */
+  fixedCharges: { manjeera: 120, maintenance: 1300 },
 };

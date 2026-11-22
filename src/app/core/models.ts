@@ -30,7 +30,7 @@ export interface FlatBill {
 export interface BillSource {
   fileName: string;
   sheetName?: string;
-  kind: 'excel' | 'image-manual' | 'manual' | 'drive';
+  kind: 'excel' | 'image-ocr' | 'image-manual' | 'manual' | 'drive';
   driveFileId?: string;
   importedAt: string;
 }
