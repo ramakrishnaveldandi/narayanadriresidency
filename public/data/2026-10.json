@@ -1,0 +1,674 @@
+{
+  "bill": {
+    "month": "2026-10",
+    "title": "Narayanadri Residency - October 2026 Maintenance",
+    "columns": [
+      {
+        "key": "flat_1",
+        "sourceHeader": "FLAT",
+        "sourceIndex": 0,
+        "label": "Flat",
+        "role": "flat"
+      },
+      {
+        "key": "previous_1",
+        "sourceHeader": "PREVIOUS",
+        "sourceIndex": 1,
+        "label": "Previous Meter Reading",
+        "role": "info"
+      },
+      {
+        "key": "present_1",
+        "sourceHeader": "PRESENT",
+        "sourceIndex": 2,
+        "label": "Present Meter Reading",
+        "role": "info"
+      },
+      {
+        "key": "total_1",
+        "sourceHeader": "Total",
+        "sourceIndex": 3,
+        "label": "Water Consumed (Ltrs)",
+        "role": "info"
+      },
+      {
+        "key": "slab_i_1",
+        "sourceHeader": "SLAB I",
+        "sourceIndex": 4,
+        "label": "Slab I Usage (Ltrs)",
+        "role": "info"
+      },
+      {
+        "key": "slb_ii_ltrs_1",
+        "sourceHeader": "SLB II Ltrs(",
+        "sourceIndex": 5,
+        "label": "Slab II Usage (Ltrs)",
+        "role": "info"
+      },
+      {
+        "key": "per_ltr_in_1",
+        "sourceHeader": "Per Ltr in",
+        "sourceIndex": 6,
+        "label": "Per Ltr in",
+        "role": "ignore"
+      },
+      {
+        "key": "per_ltr_in_2",
+        "sourceHeader": "Per Ltr in",
+        "sourceIndex": 7,
+        "label": "Per Ltr in",
+        "role": "ignore"
+      },
+      {
+        "key": "slab_i_2",
+        "sourceHeader": "Slab I",
+        "sourceIndex": 8,
+        "label": "Slab I Water Charge (₹)",
+        "role": "info"
+      },
+      {
+        "key": "slab_ii_1",
+        "sourceHeader": "Slab II",
+        "sourceIndex": 9,
+        "label": "Slab II Water Charge (₹)",
+        "role": "info"
+      },
+      {
+        "key": "flat_2",
+        "sourceHeader": "FLAT",
+        "sourceIndex": 10,
+        "label": "FLAT",
+        "role": "ignore"
+      },
+      {
+        "key": "total_2",
+        "sourceHeader": "Total",
+        "sourceIndex": 11,
+        "label": "Water Charges",
+        "role": "expense"
+      },
+      {
+        "key": "manjeera_1",
+        "sourceHeader": "Manjeera",
+        "sourceIndex": 12,
+        "label": "Manjeera Water",
+        "role": "expense"
+      },
+      {
+        "key": "mnts_1",
+        "sourceHeader": "MNTS",
+        "sourceIndex": 13,
+        "label": "Maintenance",
+        "role": "expense"
+      },
+      {
+        "key": "total_3",
+        "sourceHeader": "TOTAL",
+        "sourceIndex": 14,
+        "label": "Total Due",
+        "role": "total"
+      }
+    ],
+    "flats": [
+      {
+        "flat": "101",
+        "values": {
+          "previous_1": 921630,
+          "present_1": 929980,
+          "total_1": 8350,
+          "slab_i_1": 8350,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 232.965,
+          "slab_ii_1": 0,
+          "total_2": 233,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1653
+        },
+        "total": 1653,
+        "sourceRow": 3
+      },
+      {
+        "flat": "201",
+        "values": {
+          "previous_1": 1096140,
+          "present_1": 1107440,
+          "total_1": 11300,
+          "slab_i_1": 11300,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 315.27,
+          "slab_ii_1": 0,
+          "total_2": 316,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1736
+        },
+        "total": 1736,
+        "sourceRow": 4
+      },
+      {
+        "flat": "301",
+        "values": {
+          "previous_1": 794190,
+          "present_1": 805970,
+          "total_1": 11780,
+          "slab_i_1": 11780,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 328.662,
+          "slab_ii_1": 0,
+          "total_2": 329,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1749
+        },
+        "total": 1749,
+        "sourceRow": 5
+      },
+      {
+        "flat": "401",
+        "values": {
+          "previous_1": 1535370,
+          "present_1": 1554670,
+          "total_1": 19300,
+          "slab_i_1": 15000,
+          "slb_ii_ltrs_1": 4300,
+          "slab_i_2": 418.5,
+          "slab_ii_1": 138.03,
+          "total_2": 557,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1977
+        },
+        "total": 1977,
+        "sourceRow": 6
+      },
+      {
+        "flat": "501",
+        "values": {
+          "previous_1": 1128170,
+          "present_1": 1140180,
+          "total_1": 12010,
+          "slab_i_1": 12010,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 335.079,
+          "slab_ii_1": 0,
+          "total_2": 336,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1756
+        },
+        "total": 1756,
+        "sourceRow": 7
+      },
+      {
+        "flat": "102",
+        "values": {
+          "previous_1": 1248150,
+          "present_1": 1265330,
+          "total_1": 17180,
+          "slab_i_1": 15000,
+          "slb_ii_ltrs_1": 2180,
+          "slab_i_2": 418.5,
+          "slab_ii_1": 69.978,
+          "total_2": 489,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1909
+        },
+        "total": 1909,
+        "sourceRow": 8
+      },
+      {
+        "flat": "202",
+        "values": {
+          "previous_1": 667160,
+          "present_1": 685480,
+          "total_1": 18320,
+          "slab_i_1": 15000,
+          "slb_ii_ltrs_1": 3320,
+          "slab_i_2": 418.5,
+          "slab_ii_1": 106.572,
+          "total_2": 526,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1946
+        },
+        "total": 1946,
+        "sourceRow": 9
+      },
+      {
+        "flat": "302",
+        "values": {
+          "previous_1": 909020,
+          "present_1": 914000,
+          "total_1": 4980,
+          "slab_i_1": 4980,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 138.942,
+          "slab_ii_1": 0,
+          "total_2": 139,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1559
+        },
+        "total": 1559,
+        "sourceRow": 10
+      },
+      {
+        "flat": "402",
+        "values": {
+          "previous_1": 1340660,
+          "present_1": 1352680,
+          "total_1": 12020,
+          "slab_i_1": 12020,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 335.358,
+          "slab_ii_1": 0,
+          "total_2": 336,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1756
+        },
+        "total": 1756,
+        "sourceRow": 11
+      },
+      {
+        "flat": "502",
+        "values": {
+          "previous_1": 934520,
+          "present_1": 943820,
+          "total_1": 9300,
+          "slab_i_1": 9300,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 259.47,
+          "slab_ii_1": 0,
+          "total_2": 260,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1680
+        },
+        "total": 1680,
+        "sourceRow": 12
+      },
+      {
+        "flat": "103",
+        "values": {
+          "previous_1": 997970,
+          "present_1": 1010930,
+          "total_1": 12960,
+          "slab_i_1": 12960,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 361.584,
+          "slab_ii_1": 0,
+          "total_2": 362,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1782
+        },
+        "total": 1782,
+        "sourceRow": 13
+      },
+      {
+        "flat": "203",
+        "values": {
+          "previous_1": 1135070,
+          "present_1": 1143340,
+          "total_1": 8270,
+          "slab_i_1": 8270,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 230.733,
+          "slab_ii_1": 0,
+          "total_2": 231,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1651
+        },
+        "total": 1651,
+        "sourceRow": 14
+      },
+      {
+        "flat": "303",
+        "values": {
+          "previous_1": 764840,
+          "present_1": 776380,
+          "total_1": 11540,
+          "slab_i_1": 11540,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 321.966,
+          "slab_ii_1": 0,
+          "total_2": 322,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1742
+        },
+        "total": 1742,
+        "sourceRow": 15
+      },
+      {
+        "flat": "403",
+        "values": {
+          "previous_1": 1712490,
+          "present_1": 1721780,
+          "total_1": 9290,
+          "slab_i_1": 9290,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 259.191,
+          "slab_ii_1": 0,
+          "total_2": 260,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1680
+        },
+        "total": 1680,
+        "sourceRow": 16
+      },
+      {
+        "flat": "503",
+        "values": {
+          "previous_1": 835890,
+          "present_1": 846150,
+          "total_1": 10260,
+          "slab_i_1": 10260,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 286.254,
+          "slab_ii_1": 0,
+          "total_2": 287,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1707
+        },
+        "total": 1707,
+        "sourceRow": 17
+      },
+      {
+        "flat": "104",
+        "values": {
+          "previous_1": 1046910,
+          "present_1": 1059020,
+          "total_1": 12110,
+          "slab_i_1": 12110,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 337.869,
+          "slab_ii_1": 0,
+          "total_2": 338,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1758
+        },
+        "total": 1758,
+        "sourceRow": 18
+      },
+      {
+        "flat": "204",
+        "values": {
+          "previous_1": 1192510,
+          "present_1": 1202800,
+          "total_1": 10290,
+          "slab_i_1": 10290,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 287.091,
+          "slab_ii_1": 0,
+          "total_2": 288,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1708
+        },
+        "total": 1708,
+        "sourceRow": 19
+      },
+      {
+        "flat": "304",
+        "values": {
+          "previous_1": 1447260,
+          "present_1": 1462400,
+          "total_1": 15140,
+          "slab_i_1": 15000,
+          "slb_ii_ltrs_1": 140,
+          "slab_i_2": 418.5,
+          "slab_ii_1": 4.494,
+          "total_2": 423,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1843
+        },
+        "total": 1843,
+        "sourceRow": 20
+      },
+      {
+        "flat": "404",
+        "values": {
+          "previous_1": 764950,
+          "present_1": 772420,
+          "total_1": 7470,
+          "slab_i_1": 7470,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 208.413,
+          "slab_ii_1": 0,
+          "total_2": 209,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1629
+        },
+        "total": 1629,
+        "sourceRow": 21
+      },
+      {
+        "flat": "504",
+        "values": {
+          "previous_1": 1072520,
+          "present_1": 1084530,
+          "total_1": 12010,
+          "slab_i_1": 12010,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 335.079,
+          "slab_ii_1": 0,
+          "total_2": 336,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1756
+        },
+        "total": 1756,
+        "sourceRow": 22
+      },
+      {
+        "flat": "105",
+        "values": {
+          "previous_1": 1076290,
+          "present_1": 1085510,
+          "total_1": 9220,
+          "slab_i_1": 9220,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 257.238,
+          "slab_ii_1": 0,
+          "total_2": 258,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1678
+        },
+        "total": 1678,
+        "sourceRow": 23
+      },
+      {
+        "flat": "205",
+        "values": {
+          "previous_1": 824930,
+          "present_1": 836350,
+          "total_1": 11420,
+          "slab_i_1": 11420,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 318.618,
+          "slab_ii_1": 0,
+          "total_2": 319,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1739
+        },
+        "total": 1739,
+        "sourceRow": 24
+      },
+      {
+        "flat": "305",
+        "values": {
+          "previous_1": 1127830,
+          "present_1": 1137700,
+          "total_1": 9870,
+          "slab_i_1": 9870,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 275.373,
+          "slab_ii_1": 0,
+          "total_2": 276,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1696
+        },
+        "total": 1696,
+        "sourceRow": 25
+      },
+      {
+        "flat": "405",
+        "values": {
+          "previous_1": 820990,
+          "present_1": 831320,
+          "total_1": 10330,
+          "slab_i_1": 10330,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 288.207,
+          "slab_ii_1": 0,
+          "total_2": 289,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1709
+        },
+        "total": 1709,
+        "sourceRow": 26
+      },
+      {
+        "flat": "505",
+        "values": {
+          "previous_1": 864390,
+          "present_1": 872600,
+          "total_1": 8210,
+          "slab_i_1": 8210,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 229.059,
+          "slab_ii_1": 0,
+          "total_2": 230,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1650
+        },
+        "total": 1650,
+        "sourceRow": 27
+      },
+      {
+        "flat": "106",
+        "values": {
+          "previous_1": 937100,
+          "present_1": 946490,
+          "total_1": 9390,
+          "slab_i_1": 9390,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 261.981,
+          "slab_ii_1": 0,
+          "total_2": 262,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1682
+        },
+        "total": 1682,
+        "sourceRow": 28
+      },
+      {
+        "flat": "206",
+        "values": {
+          "previous_1": 714190,
+          "present_1": 721820,
+          "total_1": 7630,
+          "slab_i_1": 7630,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 212.877,
+          "slab_ii_1": 0,
+          "total_2": 213,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1633
+        },
+        "total": 1633,
+        "sourceRow": 29
+      },
+      {
+        "flat": "306",
+        "values": {
+          "previous_1": 748050,
+          "present_1": 750560,
+          "total_1": 2510,
+          "slab_i_1": 2510,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 70.029,
+          "slab_ii_1": 0,
+          "total_2": 71,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1491
+        },
+        "total": 1491,
+        "sourceRow": 30
+      },
+      {
+        "flat": "406",
+        "values": {
+          "previous_1": 1200730,
+          "present_1": 1218260,
+          "total_1": 17530,
+          "slab_i_1": 15000,
+          "slb_ii_ltrs_1": 2530,
+          "slab_i_2": 418.5,
+          "slab_ii_1": 81.213,
+          "total_2": 500,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1920
+        },
+        "total": 1920,
+        "sourceRow": 31
+      },
+      {
+        "flat": "506",
+        "values": {
+          "previous_1": 1322860,
+          "present_1": 1337810,
+          "total_1": 14950,
+          "slab_i_1": 14950,
+          "slb_ii_ltrs_1": 0,
+          "slab_i_2": 417.105,
+          "slab_ii_1": 0,
+          "total_2": 418,
+          "manjeera_1": 120,
+          "mnts_1": 1300,
+          "total_3": 1838
+        },
+        "total": 1838,
+        "sourceRow": 32
+      }
+    ],
+    "source": {
+      "fileName": "Oct-2026.xlsx",
+      "sheetName": "Oct-2026",
+      "kind": "excel",
+      "importedAt": "2026-11-01T00:00:00.000Z"
+    },
+    "publishedAt": "2026-11-01T00:00:00.000Z",
+    "publishedBy": "seed",
+    "version": 1
+  },
+  "payments": [],
+  "audit": [
+    {
+      "at": "2026-11-01T00:00:00.000Z",
+      "actor": "seed",
+      "action": "publish",
+      "month": "2026-10",
+      "details": "Seeded from Oct-2026.jpeg via samples/Oct-2026.xlsx"
+    }
+  ]
+}
