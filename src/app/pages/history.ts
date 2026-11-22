@@ -6,10 +6,11 @@ import { monthLabel, summarizeFlat, summarizeMonth } from '../core/billing';
 import { DataService } from '../core/data.service';
 import { InrPipe, MonthLabelPipe, StatusClassPipe } from '../shared/format';
 import { compareFlats } from '../shared/month-select';
+import { PageLoader } from '../shared/page-loader';
 
 @Component({
   selector: 'app-history',
-  imports: [RouterLink, FormsModule, InrPipe, MonthLabelPipe, StatusClassPipe],
+  imports: [RouterLink, FormsModule, InrPipe, MonthLabelPipe, StatusClassPipe, PageLoader],
   template: `
     <div class="row" style="align-items:flex-end;margin-bottom:16px">
       <div class="spacer">
@@ -37,7 +38,7 @@ import { compareFlats } from '../shared/month-select';
     }
 
     @if (months.isLoading()) {
-      <div class="empty">Loading…</div>
+      <app-page-loader message="Loading monthly history…" />
     } @else if (!rows().length) {
       <div class="empty card">No history available. <a routerLink="/admin/import">Import a month</a></div>
     } @else {
