@@ -3,6 +3,8 @@ import { APP_CONFIG } from '../config/app-config';
 
 interface Session {
   email: string;
+  /** SHA-256 of the email, compared with APP_CONFIG.admin.allowedEmailSha256. */
+  emailHash: string;
   name: string;
   /** Google ID token (JWT). Sent to the Apps Script backend, which verifies it with Google. */
   idToken: string;
@@ -35,8 +37,9 @@ const SESSION_KEY = 'nrpay.admin.google.v1';
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
 
 /**
- * Administrator session via "Sign in with Google". Only APP_CONFIG.admin.allowedEmail
- * is accepted.
+ * Administrator session via "Sign in with Google". Only the account whose SHA-256
+ * matches APP_CONFIG.admin.allowedEmailSha256 is accepted; the address itself is
+ * never shown or stored in the code.
  *
  * - API mode: the Apps Script backend verifies the ID token with Google and checks
  *   the email on every admin request, so this is enforced server-side.
@@ -55,7 +58,6 @@ export class AdminAuthService {
   readonly actor = computed(() => this.session()?.email ?? 'anonymous');
   readonly name = computed(() => this.session()?.name ?? '');
   readonly idToken = computed(() => (this.isAdmin() ? this.session()!.idToken : ''));
-  readonly allowedEmail = APP_CONFIG.admin.allowedEmail;
   readonly configured = !!APP_CONFIG.admin.googleClientId;
 
   /** Renders the Google button into `el`. Resolves after a successful sign-in; rejects on a wrong account. */
@@ -65,7 +67,7 @@ export class AdminAuthService {
     gsi.initialize({
       client_id: APP_CONFIG.admin.googleClientId,
       ux_mode: 'popup',
-      callback: ({ credential }) => onResult(this.acceptCredential(credential)),
+      callback: ({ credential }) => void this.acceptCredential(credential).then(onResult),
     });
     gsi.renderButton(el, { type: 'standard', theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill' });
   }
@@ -88,17 +90,18 @@ export class AdminAuthService {
   }
 
   /** Returns an error message, or null when the credential belongs to the allowed admin account. */
-  private acceptCredential(credential: string): string | null {
+  private async acceptCredential(credential: string): Promise<string | null> {
     const p = decodeJwt(credential);
     if (!p) return 'Could not read the Google sign-in response.';
     const email = (p.email ?? '').toLowerCase();
     if (p.aud !== APP_CONFIG.admin.googleClientId) return 'Sign-in was issued for a different application.';
     if (!p.email_verified) return 'This Google account email is not verified.';
-    if (email !== this.allowedEmail.toLowerCase()) {
+    const emailHash = await sha256Hex(email);
+    if (emailHash !== APP_CONFIG.admin.allowedEmailSha256) {
       window.google?.accounts.id.disableAutoSelect();
-      return `${p.email} is not the administrator account. Only ${this.allowedEmail} can sign in.`;
+      return 'This Google account is not authorised for administration.';
     }
-    const s: Session = { email, name: p.name ?? email, idToken: credential, exp: (p.exp ?? 0) * 1000 };
+    const s: Session = { email, emailHash, name: p.name ?? email, idToken: credential, exp: (p.exp ?? 0) * 1000 };
     this.session.set(s);
     try {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
@@ -128,7 +131,7 @@ export class AdminAuthService {
     try {
       const raw = sessionStorage.getItem(SESSION_KEY);
       const s = raw ? (JSON.parse(raw) as Session) : null;
-      return s && s.exp > Date.now() && s.email === APP_CONFIG.admin.allowedEmail.toLowerCase() ? s : null;
+      return s && s.exp > Date.now() && s.emailHash === APP_CONFIG.admin.allowedEmailSha256 ? s : null;
     } catch {
       return null;
     }
@@ -149,4 +152,9 @@ export function decodeJwt(token: string): GoogleIdPayload | null {
   } catch {
     return null;
   }
+}
+
+export async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

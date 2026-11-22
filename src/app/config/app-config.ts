@@ -67,7 +67,7 @@ export const APP_CONFIG = {
    * Empty = "static mode": data is read from /public/data/*.json and admin
    * changes are kept in the browser until exported and committed.
    */
-  apiUrl: '',
+  apiUrl: 'https://script.google.com/macros/s/AKfycbwUZFKv7ydb9QtaHYsOoIKwlNwrf65tXWvcGBz-nlEBnQsmSax1Zd8EsBPwWM0wroRwWg/exec',
 
   /** Folder under /public holding static month files. */
   dataPath: 'data',
@@ -76,8 +76,13 @@ export const APP_CONFIG = {
   paidTolerance: 1,
 
   admin: {
-    /** The only account allowed into the admin area ("Sign in with Google"). */
-    allowedEmail: 'nrassociation123@gmail.com',
+    /**
+     * SHA-256 (hex) of the only Google account allowed into the admin area, lower-case.
+     * The address itself is deliberately not in the code (this repo and the site are public).
+     * To change it: node -e "console.log(require('crypto').createHash('sha256').update('admin@example.com').digest('hex'))"
+     * The server checks the real address (Apps Script property ADMIN_EMAIL) on every request.
+     */
+    allowedEmailSha256: '7951a6b97caf71374f377c568259643bd63a4cf7b21b058bf18d58c808c609e6',
     /**
      * OAuth 2.0 Web client ID from Google Cloud Console (see README "Admin sign-in").
      * Client IDs are public identifiers - safe to commit. Empty = sign-in disabled.

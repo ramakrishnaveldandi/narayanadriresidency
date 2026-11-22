@@ -10,7 +10,7 @@ import { DataService } from '../../core/data.service';
     <div class="row" style="margin-bottom:8px">
       <h1 class="spacer">Administration</h1>
       <span class="badge info">{{ data.mode === 'api' ? 'Apps Script backend' : 'Static mode' }}</span>
-      <span class="small muted">Signed in as {{ auth.actor() }}</span>
+      <span class="small muted">Signed in as administrator</span>
       <button class="btn sm" type="button" (click)="logout()">Log out</button>
     </div>
     <nav class="tabs">

@@ -9,7 +9,7 @@ import { DataService } from '../../core/data.service';
     <div class="card stack" style="max-width:440px;margin:24px auto;text-align:center">
       <h1>Administrator sign-in</h1>
       <p class="muted" style="margin:0">
-        Only the association account <strong>{{ auth.allowedEmail }}</strong> can access administration.
+        Only the association's administrator Google account can sign in.
       </p>
       @if (auth.configured) {
         <div #gsiButton class="gsi"></div>

@@ -10,7 +10,7 @@ function jwt(payload: object): string {
 
 describe('decodeJwt', () => {
   it('reads the Google ID token payload', () => {
-    expect(decodeJwt(jwt({ email: 'nrassociation123@gmail.com', aud: 'abc', exp: 1 }))).toMatchObject({ email: 'nrassociation123@gmail.com', aud: 'abc' });
+    expect(decodeJwt(jwt({ email: 'admin@example.com', aud: 'abc', exp: 1 }))).toMatchObject({ email: 'admin@example.com', aud: 'abc' });
     expect(decodeJwt('garbage')).toBeNull();
   });
 });
@@ -24,10 +24,16 @@ describe('month visibility', () => {
     localStorage.clear();
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (url: string) => {
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const record = (m?: string) => ({ bill: { month: m, flats: [], columns: [] }, payments: [], audit: [] });
+        // Static files (public/data)
         if (url.endsWith('index.json')) return new Response(JSON.stringify(months));
-        const m = url.match(/(\d{4}-\d{2})\.json$/)?.[1];
-        return new Response(JSON.stringify({ bill: { month: m, flats: [], columns: [] }, payments: [], audit: [] }));
+        const file = url.match(/(\d{4}-\d{2})\.json$/)?.[1];
+        if (file) return new Response(JSON.stringify(record(file)));
+        // Apps Script backend: GET ?action=… or POST {action: …}
+        const params = init?.body ? JSON.parse(String(init.body)) : Object.fromEntries(new URL(url).searchParams);
+        const data = params.action === 'index' ? months.months : record(params.month);
+        return new Response(JSON.stringify({ ok: true, data }));
       }),
     );
     TestBed.configureTestingModule({
