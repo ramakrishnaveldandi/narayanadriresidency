@@ -214,13 +214,13 @@ const EXCEL_TYPES: Record<string, string> = {
           <label class="field">Correction reason (required to replace a published month) <input [(ngModel)]="correctionReason" /></label>
         }
         @if (paidInSheet().length) {
-          <label class="small">
+          <label class="small" style="display:block">
             <input type="checkbox" [(ngModel)]="markPaidFromSheet" />
             Mark the <strong>{{ paidInSheet().length }}</strong> flats with Status "P" in the sheet as <strong>Paid</strong>
             (records a verified payment of the balance due for each).
           </label>
         }
-        <label class="small"><input type="checkbox" [(ngModel)]="reviewed" /> I have checked the figures against the Excel sheet.</label>
+        <label class="small" style="display:block"><input type="checkbox" [(ngModel)]="reviewed" /> I have checked the figures against the Excel sheet.</label>
         <div class="row">
           <button class="btn primary" type="button" (click)="publish()" [disabled]="busy() || validation().errors.length > 0 || !reviewed">
             {{ busy() ? 'Publishing…' : 'Publish ' + (month() | monthLabel) }}

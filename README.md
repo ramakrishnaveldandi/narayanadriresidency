@@ -27,28 +27,19 @@ GitHub Pages.
   and **Pending** otherwise.
 - Resident-submitted payments never count until an administrator verifies them.
 
-## How the Oct-2026 sheet is read
+## Monthly Excel import
 
-The sheet has three columns called "Total": litres used, the water charge, and the final **TOTAL**. The import does not
-assume that the last column is the total. A column template (`NARAYANADRI_TEMPLATE` in `src/app/config/app-config.ts`) maps
-the columns like this:
+Upload the association's workbook (`NR-WaterMeterReadings_2026.xlsx`, one sheet per month) or a single-sheet file. The app always reads **the file you upload**:
 
-| Source column | Used as |
-| --- | --- |
-| FLAT (1st) | Flat number |
-| PREVIOUS, PRESENT, Total (1st), SLAB I, SLB II Ltrs, Slab I ₹, Slab II ₹ | Info (shown under "Water meter & calculation details") |
-| Total (2nd) | Expense: Water Charges |
-| Manjeera | Expense: Manjeera Water |
-| MNTS | Expense: Maintenance |
-| TOTAL (3rd) | Total due |
-| Per Ltr, FLAT (2nd) | Ignored |
+- **The latest month's sheet is selected automatically.** The month comes from the sheet name, e.g. `OCT 2026`. Every sheet is listed with its month, so you can pick an older one.
+- **Columns are mapped by header name.** FLAT NO., PREVIOUS READING, PRESENT, TARE IN LTRS, the slab columns, rates, Total WATER CHARGES (Rounded), Manjeera Water Bill per Flat, MNTS CHARGES, `TOTAL` and `Status`. The 2019-20 layout is supported too.
+- **Extra charges are picked up automatically.** Any column between the water charges and `TOTAL` becomes a bill line item, e.g. Septic Tank Expenses or Repair Manjeera. Columns to the right of `TOTAL` are ignored.
+- **`TOTAL` is the amount due.** It is never "the last column". If the line items don't add up to it, you get a warning.
+- **Notes and the summary block are skipped.** Rows below the table (Total Water Readings, Amount to be collected, Common water usage, Note:) are not treated as flats.
+- **Status "P" means paid.** On publish, you can tick an option to mark those flats as Paid.
+- **Month mismatches are flagged.** If the sheet name and the title row disagree on the month, you get a warning.
 
-For the rows where all three exist, the importer warns when the line items do not add up to the total. The water charge
-works out to `ceil(min(litres, 15000) × 0.0279 + max(0, litres − 15000) × 0.0321)`. The seed script checks that rule against
-all 30 flats on the sheet.
-
-Other layouts still work. When there is no template match, the importer looks for a "Flat" header and a single "Total"-like
-column, and the admin can change any column's role on the import screen.
+The column rules are in `NARAYANADRI_TEMPLATE` (`src/app/config/app-config.ts`). Keep the workbook itself out of this public repository; `.gitignore` excludes `NR-WaterMeterReadings*.xlsx`.
 
 ## Getting started
 

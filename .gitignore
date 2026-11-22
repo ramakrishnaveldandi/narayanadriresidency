@@ -42,3 +42,6 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Association data workbooks (private - never commit)
+NR-WaterMeterReadings*.xlsx
