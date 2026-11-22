@@ -13,7 +13,7 @@ GitHub Pages.
 | Flat details | Bill breakdown (water, Manjeera, maintenance), meter-reading details, total due, verified payments, balance, link back to the source row | FR-04 |
 | Pay | UPI deep link (`upi://pay`) with payee, amount and note pre-filled. QR code generated for that amount. Copy the UPI ID. Association's printed QR as a fallback. Partial amounts allowed | FR-05 |
 | Payment proof | Resident enters the UTR. It goes to the backend (API mode) or into a pre-filled WhatsApp message (static mode). Stays "awaiting verification" until an admin checks it | FR-05/06, §9 |
-| History | Every published month, for one flat or the whole apartment. **Admin only** | FR-07 |
+| History | Every published month, for one flat or the whole apartment. **Admin only.** Admins can **delete a month** (with a reason and typed confirmation) to fix it and upload it again. Payments are kept. Residents always see the newest remaining month | FR-07 |
 | Admin import | Upload Excel/CSV (or pick from Google Drive). Header and month are detected automatically. Column roles are mapped with a template, the grid can be edited, the data is validated, then published. Re-publishing needs a correction reason and is logged | FR-01, FR-08, §5 |
 | Payments | Record verified payments (full or partial, several per month). Verify or reject resident submissions. Void with a reason. Duplicate UTRs are blocked | FR-06 |
 | Reconcile | Upload a bank or UPI statement. Credits are matched to flats by UTR or by the flat number in the narration, then recorded or verified line by line | FR-06 |

@@ -27,6 +27,8 @@ export interface DriveFile {
 interface LocalStore {
   index?: MonthIndexEntry[];
   months: Record<MonthKey, MonthRecord>;
+  /** Months deleted by the admin (static mode log; payments stay in the month file). */
+  deleted?: { month: MonthKey; at: string; actor: string; reason: string }[];
 }
 
 const LOCAL_KEY = 'nrpay.local.v1';
@@ -160,6 +162,32 @@ export class DataService {
       n++;
     }
     if (n) record.audit.push(this.audit('mark-paid-from-sheet', record.bill.month, `${n} flats marked Paid from the sheet's Status column`));
+  }
+
+  /**
+   * Deletes a published month so it can be corrected and uploaded again.
+   * Payments recorded for the month are kept and reappear when it is re-published.
+   * Residents always see the newest remaining month.
+   *  - API mode: the month's data file and Excel go to the Google Drive Trash; if it was
+   *    the latest month, the previous month's files move back from History to Latest.
+   *  - Static mode: the month is removed from this browser's index (export to publish).
+   */
+  async deleteMonth(month: MonthKey, reason: string): Promise<void> {
+    this.auth.requireAdmin();
+    if (!reason.trim()) throw new Error('Enter a reason for deleting this month.');
+    const index = await this.loadIndex();
+    if (!index.some((m) => m.month === month)) throw new Error(`${month} is not published.`);
+    if (this.mode === 'api') {
+      await this.apiPost({ action: 'deleteMonth', month, reason });
+    } else {
+      const store = this.ensureLocal();
+      store.index = (store.index ?? [...this.allIndex()]).filter((m) => m.month !== month);
+      delete store.months[month];
+      store.deleted = [...(store.deleted ?? []), { month, at: new Date().toISOString(), actor: this.auth.actor(), reason }];
+      this.writeLocal(store);
+    }
+    this.cache.delete(month);
+    await this.loadIndex(true);
   }
 
   async addPayment(input: Omit<Payment, 'id' | 'recordedAt' | 'recordedBy'>): Promise<Payment> {
